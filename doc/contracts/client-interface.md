@@ -1,0 +1,103 @@
+# wspulse Client Interface Contract
+
+> Version: 0 (unstable — aligned with protocol v0)
+> Applies to: all `wspulse/client-*` libraries
+
+This document defines the **language-agnostic API surface** that every wspulse client library must expose. Naming and syntax are adapted per language; semantics are fixed.
+
+For wire-level details see [`server/doc/protocol.md`](https://github.com/wspulse/server/blob/main/doc/protocol.md).
+For behavioural contracts (lifecycle, callbacks, reconnect semantics) see [`client-behaviour.md`](./client-behaviour.md).
+
+---
+
+## Core Concepts
+
+### Frame
+
+The minimal transport unit. All fields are optional at the wire layer.
+
+| Field     | Type           | Description                                            |
+| --------- | -------------- | ------------------------------------------------------ |
+| `id`      | string         | Opaque correlation ID. Omit if not needed.             |
+| `event`   | string         | Application-defined event name.                        |
+| `payload` | any JSON value | Opaque body. The client does not interpret this field. |
+
+### Client
+
+The object returned by the entry-point function. Must expose:
+
+| Concept   | Requirement                                                                                     |
+| --------- | ----------------------------------------------------------------------------------------------- |
+| **Send**  | Enqueue a Frame for delivery. Returns/throws `ConnectionClosedError` if the client is closed.   |
+| **Close** | Permanently terminate the connection and stop any reconnect loop. Idempotent.                   |
+| **Done**  | A signal (channel / Promise / Event / AsyncStream) that resolves when permanently disconnected. |
+
+---
+
+## Entry Point
+
+```
+connect(url, options) → Client
+```
+
+- `url`: WebSocket URL string (e.g. `wss://host/ws?token=…`)
+- `options`: language-specific options object / builder / named parameters
+- Returns a connected Client, or throws/returns an error if the initial connection fails and auto-reconnect is disabled.
+
+---
+
+## Options (Required)
+
+Every implementation must support these options:
+
+| Option            | Type / Signature                    | Default     | Description                                                                                       |
+| ----------------- | ----------------------------------- | ----------- | ------------------------------------------------------------------------------------------------- |
+| `onMessage`       | `(Frame) → void`                    | no-op       | Called for every inbound frame.                                                                   |
+| `onDisconnect`    | `(error\|null) → void`              | no-op       | Called on permanent disconnect. `null`/`nil` = clean close. See behaviour doc for full semantics. |
+| `onReconnect`     | `(attempt: int) → void`             | no-op       | Called at each reconnect attempt. `attempt` is 0-based.                                           |
+| `onTransportDrop` | `(error) → void`                    | no-op       | Called each time the underlying transport drops (before any reconnect).                           |
+| `autoReconnect`   | `(maxRetries, baseDelay, maxDelay)` | disabled    | Enable exponential backoff reconnect. `maxRetries ≤ 0` = unlimited.                               |
+| `heartbeat`       | `(pingPeriod, pongWait)`            | 20 s / 60 s | Configure client-side heartbeat timing expectations.                                              |
+| `writeWait`       | duration                            | 10 s        | Deadline for a single write operation.                                                            |
+| `maxMessageSize`  | bytes (int)                         | 1 MiB       | Max inbound message size. Connection closed if exceeded.                                          |
+| `dialHeaders`     | map\<string, string\>               | none        | Extra HTTP headers sent during WebSocket upgrade.                                                 |
+
+---
+
+## Backoff Formula
+
+All implementations must use this formula:
+
+```
+attempt_delay = min(baseDelay × 2^attempt, maxDelay) × jitter
+jitter        = uniform random in [0.8, 1.2]
+```
+
+This matches `client-go` exactly. Any deviation is a bug.
+
+---
+
+## Error / Exception Values
+
+Each language maps these sentinel concepts to its own error type. The names below are conceptual:
+
+| Concept                 | When raised / returned                                                    |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `ConnectionClosedError` | `send()` called after the client is permanently closed.                   |
+| `RetriesExhaustedError` | Passed to `onDisconnect` when max reconnect retries are exhausted.        |
+| `ConnectionLostError`   | Passed to `onDisconnect` when the server drops and auto-reconnect is off. |
+
+---
+
+## Language Mapping
+
+| Concept          | Go (`client-go`)                     | TypeScript (`client-ts`)     | Kotlin (`client-kt`)                 | Swift (`client-swift`)                  | Python (`client-py`)                        |
+| ---------------- | ------------------------------------ | ---------------------------- | ---------------------------------------- | --------------------------------------- | ----------------------------------------------- |
+| Entry point      | `Dial(url, ...opts) (Client, error)` | `connect(url, opts): Client` | `WspulseClient.connect(url, config)`     | `WspulseClient(url:options:).connect()` | `async with wspulse.connect(url, **opts) as c:` |
+| Send             | `client.Send(Frame) error`           | `client.send(frame): void`   | `suspend client.send(frame)`             | `await client.send(frame)`              | `await client.send(frame)`                      |
+| Close            | `client.Close() error`               | `client.close(): void`       | `suspend client.close()`                 | `await client.close()`                  | `await client.close()`                          |
+| Done signal      | `client.Done() <-chan struct{}`      | `client.done: Promise<void>` | `client.done: CompletableDeferred<Unit>` | `client.done: AsyncStream<Void>`        | `client.done: asyncio.Event`                    |
+| Frame type       | `core.Frame{ID, Event, Payload}`     | `{ id?, event?, payload? }`  | `data class Frame(id, event, payload)`   | `struct Frame { id, event, payload }`   | `@dataclass Frame(id, event, payload)`          |
+| ConnectionClosed | `ErrConnectionClosed` (from core)    | `ConnectionClosedError`      | `ConnectionClosedException`              | `WspulseError.connectionClosed`         | `ConnectionClosedError`                         |
+| RetriesExhausted | `ErrRetriesExhausted`                | `RetriesExhaustedError`      | `RetriesExhaustedException`              | `WspulseError.retriesExhausted`         | `RetriesExhaustedError`                         |
+| ConnectionLost   | `ErrConnectionLost`                  | `ConnectionLostError`        | `ConnectionLostException`                | `WspulseError.connectionLost`           | `ConnectionLostError`                           |
