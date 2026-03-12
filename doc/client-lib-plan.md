@@ -106,6 +106,22 @@ delay = min(baseDelay * 2^attempt, maxDelay) * jitter(0.8..1.2)
 - **Repo**: `wspulse/client-kotlin`
 - **Status**: planned
 
+### Swift (`wspulse/client-swift`)
+
+- **Environments**: iOS 16+ / macOS 13+ / watchOS 9+ / tvOS 16+
+- **Package name**: `WspulseClient` (Swift Package Manager)
+- **Key idioms**:
+  - `WspulseClient(url:options:)` — plain initialiser; call `connect()` to start
+  - `async/await`: `func send(_ frame: Frame) async throws`; `func close() async`
+  - `done: AsyncStream<Void>` or `withTaskCancellationHandler` integration
+  - Callbacks as closures in `WspulseClientOptions` value type (builder pattern via `init` params)
+  - `onMessage: ((Frame) -> Void)?`; `onDisconnect: ((Error?) -> Void)?`; etc.
+  - Auto-reconnect with same backoff formula; retry loop runs inside a detached `Task`
+  - `Sendable`-conformant types throughout (Swift 6 strict concurrency)
+- **Dependencies**: `URLSessionWebSocketTask` (stdlib, zero external deps)
+- **Repo**: `wspulse/client-swift`
+- **Status**: planned
+
 ---
 
 ## Shared Test Scenarios (All Languages)
@@ -131,15 +147,17 @@ Every client lib must pass these behavioural tests (tested against `wspulse/serv
 |------------|-------------------------|-----------------------------------|
 | Go         | `wspulse/client-go`     | `github.com/wspulse/client-go`    |
 | TypeScript | `wspulse/client-ts`     | `@wspulse/client`                 |
-| Python     | `wspulse/client-python` | `wspulse-client` (PyPI)           |
 | Kotlin     | `wspulse/client-kotlin` | `com.wspulse:client-kotlin`       |
+| Swift      | `wspulse/client-swift`  | `WspulseClient` (SPM)             |
+| Python     | `wspulse/client-python` | `wspulse-client` (PyPI)           |
 
 ---
 
 ## Prioritisation
 
 1. **TypeScript** — highest demand; covers both browser and Node.js; completes the most common full-stack use case.
-2. **Python** — broad adoption; asyncio model maps cleanly to the Go goroutine model.
-3. **Kotlin** — Android support; fills mobile client gap.
+2. **Kotlin** — Android + JVM; builder DSL maps cleanly to the Go options pattern.
+3. **Swift** — iOS/macOS native; zero external deps via `URLSessionWebSocketTask`.
+4. **Python** — broad adoption; asyncio model maps cleanly to the Go goroutine model.
 
 Each language will be developed independently on its own repo. No shared scaffolding is required — common only the wire protocol.
