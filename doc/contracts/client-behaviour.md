@@ -13,10 +13,10 @@ This document defines the **behavioural requirements** that every wspulse client
 stateDiagram-v2
     [*] --> INIT
     INIT --> CONNECTED : connect()
-    CONNECTED --> RECONNECTING : transport drop\n(autoReconnect on)
+    CONNECTED --> RECONNECTING : transport drop <br> (autoReconnect on)
     CONNECTED --> CLOSED : close()
-    CONNECTED --> CLOSED : transport drop\n(autoReconnect off)
-    RECONNECTING --> CONNECTED : dial success\n(maxRetries not exhausted)
+    CONNECTED --> CLOSED : transport drop <br> (autoReconnect off)
+    RECONNECTING --> CONNECTED : dial success <br> (maxRetries not exhausted)
     RECONNECTING --> CLOSED : maxRetries exhausted
     RECONNECTING --> CLOSED : close()
     CLOSED --> [*]
