@@ -6,9 +6,9 @@ A modular WebSocket library ecosystem for Go — minimal, production-ready, and 
 
 ```mermaid
 graph LR
-    core["<b>core</b><br/>Frame · Codec · router"]
+    core["<b>core</b><br/>Frame · Codec · Router"]
     server["<b>server</b><br/>Server · Connection · Hub"]
-    client-go["<b>client-go</b><br/>Client · Dial · backoff"]
+    client-go["<b>client-go</b><br/>Client · Dial · Backoff"]
     server --> core
     client-go --> core
 ```
