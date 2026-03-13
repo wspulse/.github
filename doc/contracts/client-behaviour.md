@@ -63,7 +63,7 @@ States are conceptual; implementations need not expose them as an enum.
 When `autoReconnect` is enabled:
 
 1. On transport drop → fire `onTransportDrop(err)`.
-2. Wait `delay = min(baseDelay × 2^attempt, maxDelay) × jitter(0.8..1.2)`.
+2. Wait `delay = min(baseDelay × 2^attempt, maxDelay) × jitter(0.5..1.0)` (equal jitter).
 3. Fire `onReconnect(attempt)`.
 4. Attempt to dial.
 5. If successful → go to `CONNECTED`; pendng send-queue is preserved.

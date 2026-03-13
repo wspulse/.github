@@ -69,8 +69,9 @@ Every implementation must support these options:
 All implementations must use this formula:
 
 ```
-attempt_delay = min(baseDelay × 2^attempt, maxDelay) × jitter
-jitter        = uniform random in [0.8, 1.2]
+delay       = min(baseDelay × 2^attempt, maxDelay)
+jitter      = uniform random in [0.5, 1.0]   (equal jitter)
+result      = delay × jitter
 ```
 
 This matches `client-go` exactly. Any deviation is a bug.
@@ -91,7 +92,7 @@ Each language maps these sentinel concepts to its own error type. The names belo
 
 ## Language Mapping
 
-| Concept          | Go (`client-go`)                     | TypeScript (`client-ts`)     | Kotlin (`client-kt`)                 | Swift (`client-swift`)                  | Python (`client-py`)                        |
+| Concept          | Go (`client-go`)                     | TypeScript (`client-ts`)     | Kotlin (`client-kt`)                     | Swift (`client-swift`)                  | Python (`client-py`)                            |
 | ---------------- | ------------------------------------ | ---------------------------- | ---------------------------------------- | --------------------------------------- | ----------------------------------------------- |
 | Entry point      | `Dial(url, ...opts) (Client, error)` | `connect(url, opts): Client` | `WspulseClient.connect(url, config)`     | `WspulseClient(url:options:).connect()` | `async with wspulse.connect(url, **opts) as c:` |
 | Send             | `client.Send(Frame) error`           | `client.send(frame): void`   | `suspend client.send(frame)`             | `await client.send(frame)`              | `await client.send(frame)`                      |
