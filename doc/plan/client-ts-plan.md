@@ -1,6 +1,6 @@
 # wspulse TypeScript Client — Development Plan (`client-ts`)
 
-> Status: P1–P4 complete · Last updated: 2026-03-14
+> Status: P1–P5 complete · Last updated: 2026-03-15
 > Repo: `wspulse/client-ts` · Package: `@wspulse/client`
 
 **Read before starting:**
@@ -54,7 +54,7 @@ client-ts/
 ### P1 — Project Scaffold ✅
 
 - [x] Create repo `wspulse/client-ts`
-- [x] `package.json`:  name `@wspulse/client` v0.1.0, `type: "module"`, dual exports, peer dep `ws >=8`, dev deps typescript/vitest/eslint/prettier
+- [x] `package.json`: name `@wspulse/client` v0.1.0, `type: "module"`, dual exports, peer dep `ws >=8`, dev deps typescript/vitest/eslint/prettier
 - [x] `tsconfig.json`: strict, ES2022, NodeNext
 - [x] `tsconfig.build.json`: declarationMap, outDir dist/
 - [x] `vitest.config.ts` with environment node and coverage v8
@@ -121,7 +121,7 @@ client-ts/
   ): number {
     const exp = Math.min(baseDelay * 2 ** attempt, maxDelay);
     const half = exp / 2;
-    return half + Math.random() * half;  // equal jitter [0.5, 1.0]
+    return half + Math.random() * half; // equal jitter [0.5, 1.0]
   }
   ```
 
@@ -143,27 +143,27 @@ client-ts/
 - [x] **Heartbeat (Node.js `ws` only)**: `startHeartbeat(ws)` sends Ping every `pingPeriod` via `setInterval`; starts `pongWait` deadline timer after each Ping; resets deadline on Pong via `ws.on("pong", ...)`. Browser: no-op (browser handles ping/pong automatically).
 - [x] **`writeWait`**: `sendWithTimeout(data, timeoutMs)` helper wraps `ws.send()` with `setTimeout` that closes WS on timeout. Used for control frames.
 - [x] **`maxMessageSize`**: enforced in `onmessage` via `String(ev.data).length` check; closes with code 1009 and triggers `handleTransportDrop()` directly (detaches `onclose` first to avoid double-fire).
-- [ ] Document browser limitation: `dialHeaders` is **not supported** in the browser WebSocket API.
+- [x] Document browser limitation: `dialHeaders` is **not supported** in the browser WebSocket API (documented in README).
 
 ### P5 — Test Suite (partially complete)
 
 34 tests passing across 5 test files. Scenarios 1–7 and 9 covered using lightweight `ws.WebSocketServer` echo servers (no live `wspulse/server` required). Scenario 8 is N/A for single-threaded JS.
 
-| #   | Scenario                                                      | Status |
-| --- | ------------------------------------------------------------- | ------ |
-| 1   | Connect → send → echo → close clean                           | ✅ Done |
-| 2   | Server drops → onTransportDrop + onDisconnect (no reconnect)  | ✅ Done |
-| 3   | Auto-reconnect: server drops → reconnects within maxRetries   | ✅ Done |
-| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedError)` | ✅ Done |
-| 5   | `close()` during reconnect → loop stops, `onDisconnect(null)` | ✅ Done |
-| 6   | `send()` on closed client → `ConnectionClosedError`           | ✅ Done |
+| #   | Scenario                                                      | Status                                         |
+| --- | ------------------------------------------------------------- | ---------------------------------------------- |
+| 1   | Connect → send → echo → close clean                           | ✅ Done                                        |
+| 2   | Server drops → onTransportDrop + onDisconnect (no reconnect)  | ✅ Done                                        |
+| 3   | Auto-reconnect: server drops → reconnects within maxRetries   | ✅ Done                                        |
+| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedError)` | ✅ Done                                        |
+| 5   | `close()` during reconnect → loop stops, `onDisconnect(null)` | ✅ Done                                        |
+| 6   | `send()` on closed client → `ConnectionClosedError`           | ✅ Done                                        |
 | 7   | Heartbeat pong timeout → transport drop                       | ✅ Done (short pongWait, server ignores pings) |
-| 8   | Concurrent sends: no race / interleaving                      | N/A (single-threaded JS) |
-| 9   | Concurrent close + transport drop → onDisconnect exactly once | ✅ Done |
+| 8   | Concurrent sends: no race / interleaving                      | N/A (single-threaded JS)                       |
+| 9   | Concurrent close + transport drop → onDisconnect exactly once | ✅ Done                                        |
 
 Additional tests: done resolution, close idempotency, head-drop on buffer overflow, connect failure to unreachable host, message ordering, maxMessageSize enforcement.
 
-- [ ] P5 stretch: integration tests against a live `wspulse/server` instance (vitest globalSetup with `go run .`)
+- [x] P5 stretch: integration tests against a live `wspulse/server` instance (vitest globalSetup with `go run .`) — 6 tests via `testserver/` Go program
 
 ---
 
@@ -172,15 +172,15 @@ Additional tests: done resolution, close idempotency, head-drop on buffer overfl
 1. **Single-threaded safety**: JavaScript's event loop means no mutex is needed for the send buffer. However, async re-entrancy in the reconnect loop must be guarded with an `_isReconnecting` flag.
 2. **`done` Promise**: backed by a `{ resolve, reject }` deferred captured at construction. Resolves (not rejects) in all cases — callers check `onDisconnect`'s argument for the error.
 3. **Browser `dialHeaders` limitation**: the `WebSocket` constructor accepts only `url` and `protocols`. Raise an `Error` with a clear message if `dialHeaders` is set in a browser context.
-4. **ESM/CJS dual build**: use `tsup` or `rollup` to produce both `dist/index.js` (ESM) and `dist/index.cjs`; both must include `.d.ts` declarations.
+4. **ESM/CJS dual build**: implemented with `tsup` — produces `dist/index.js` (ESM, ~11 KB), `dist/index.cjs` (CJS, ~12 KB), and `.d.ts` / `.d.cts` declarations.
 5. **`ws` package as peer dep**: do not import `ws` at the top level; dynamically detect environment: `typeof WebSocket !== "undefined" ? WebSocket : (await import("ws")).WebSocket`.
 
 ---
 
 ## Publish Checklist (P6)
 
-- [ ] README: quick-start (browser + Node.js examples)
-- [ ] CHANGELOG.md with version 0.1.0 entry
+- [x] README: quick-start (browser + Node.js examples)
+- [x] CHANGELOG.md with version 0.1.0 entry
 - [ ] `npm publish --access public --provenance` from CI on git tag
 - [ ] GitHub release with NPM badge
 - [ ] Register package at [npmjs.com](https://npmjs.com)
