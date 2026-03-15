@@ -22,6 +22,18 @@ The minimal transport unit. All fields are optional at the wire layer.
 | `event`   | string         | Application-defined event name.                        |
 | `payload` | any JSON value | Opaque body. The client does not interpret this field. |
 
+### Codec
+
+Encodes and decodes Frames for WebSocket transmission. Every client library must accept an optional Codec and ship a default JSON codec.
+
+| Concept      | Requirement                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| **Encode**   | Serialize a Frame into wire data (`string` for text frames, `bytes` for binary frames).                         |
+| **Decode**   | Deserialize received wire data into a Frame.                                                                    |
+| **FrameType**| Declare whether the codec produces text frames (opcode 1) or binary frames (opcode 2).                          |
+
+The default codec (`JSONCodec`) serializes Frames as JSON text frames. Custom codecs (e.g. Protocol Buffers) may use binary frames. The codec determines the WebSocket message type used for sending and the expected format for receiving.
+
 ### Client
 
 The object returned by the entry-point function. Must expose:
@@ -61,6 +73,7 @@ Every implementation must support these options:
 | `writeWait`       | duration                            | 10 s        | Deadline for a single write operation.                                                            |
 | `maxMessageSize`  | bytes (int)                         | 1 MiB       | Max inbound message size. Connection closed if exceeded.                                          |
 | `dialHeaders`     | map\<string, string\>               | none        | Extra HTTP headers sent during WebSocket upgrade.                                                 |
+| `codec`           | Codec                               | JSONCodec   | Wire-format codec for encoding/decoding Frames. Custom codecs enable binary protocols.            |
 
 ---
 
@@ -99,6 +112,8 @@ Each language maps these sentinel concepts to its own error type. The names belo
 | Close            | `client.Close() error`               | `client.close(): void`       | `suspend client.close()`                 | `await client.close()`                  | `await client.close()`                          |
 | Done signal      | `client.Done() <-chan struct{}`      | `client.done: Promise<void>` | `client.done: CompletableDeferred<Unit>` | `client.done: AsyncStream<Void>`        | `client.done: asyncio.Event`                    |
 | Frame type       | `core.Frame{ID, Event, Payload}`     | `{ id?, event?, payload? }`  | `data class Frame(id, event, payload)`   | `struct Frame { id, event, payload }`   | `@dataclass Frame(id, event, payload)`          |
+| Codec interface  | `core.Codec` (Encode/Decode/FrameType) | `Codec` (encode/decode/binaryType) | `Codec` (encode/decode/frameType) | `WspulseCodec` (encode/decode/frameType) | `Codec` (encode/decode/frame_type) |
+| Default codec    | `core.JSONCodec`                     | `JSONCodec`                  | `JsonCodec`                              | `JSONCodec`                             | `JSONCodec`                                     |
 | ConnectionClosed | `ErrConnectionClosed` (from core)    | `ConnectionClosedError`      | `ConnectionClosedException`              | `WspulseError.connectionClosed`         | `ConnectionClosedError`                         |
 | RetriesExhausted | `ErrRetriesExhausted`                | `RetriesExhaustedError`      | `RetriesExhaustedException`              | `WspulseError.retriesExhausted`         | `RetriesExhaustedError`                         |
 | ConnectionLost   | `ErrConnectionLost`                  | `ConnectionLostError`        | `ConnectionLostException`                | `WspulseError.connectionLost`           | `ConnectionLostError`                           |
