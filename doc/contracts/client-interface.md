@@ -62,18 +62,18 @@ connect(url, options) → Client
 
 Every implementation must support these options:
 
-| Option            | Type / Signature                    | Default     | Description                                                                                       |
-| ----------------- | ----------------------------------- | ----------- | ------------------------------------------------------------------------------------------------- |
-| `onMessage`       | `(Frame) → void`                    | no-op       | Called for every inbound frame.                                                                   |
-| `onDisconnect`    | `(error\|null) → void`              | no-op       | Called on permanent disconnect. `null`/`nil` = clean close. See behaviour doc for full semantics. |
-| `onReconnect`     | `(attempt: int) → void`             | no-op       | Called at each reconnect attempt. `attempt` is 0-based.                                           |
-| `onTransportDrop` | `(error) → void`                    | no-op       | Called each time the underlying transport drops (before any reconnect).                           |
-| `autoReconnect`   | `(maxRetries, baseDelay, maxDelay)` | disabled    | Enable exponential backoff reconnect. `maxRetries ≤ 0` = unlimited.                               |
+| Option            | Type / Signature                    | Default     | Description                                                                                                                                                                                                    |
+| ----------------- | ----------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onMessage`       | `(Frame) → void`                    | no-op       | Called for every inbound frame.                                                                                                                                                                                |
+| `onDisconnect`    | `(error\|null) → void`              | no-op       | Called on permanent disconnect. `null`/`nil` = clean close. See behaviour doc for full semantics.                                                                                                              |
+| `onReconnect`     | `(attempt: int) → void`             | no-op       | Called at each reconnect attempt. `attempt` is 0-based.                                                                                                                                                        |
+| `onTransportDrop` | `(error) → void`                    | no-op       | Called each time the underlying transport drops (before any reconnect).                                                                                                                                        |
+| `autoReconnect`   | `(maxRetries, baseDelay, maxDelay)` | disabled    | Enable exponential backoff reconnect. `maxRetries ≤ 0` = unlimited.                                                                                                                                            |
 | `heartbeat`       | `(pingPeriod, pongWait)`            | 20 s / 60 s | Client-side Ping/Pong interval. The client sends Ping every `pingPeriod` and closes the socket if no Pong arrives within `pongWait`. Browser clients: no-op (browser handles Ping/Pong at the protocol level). |
-| `writeWait`       | duration                            | 10 s        | Deadline for a single write operation.                                                            |
-| `maxMessageSize`  | bytes (int)                         | 1 MiB       | Max inbound message size. Connection closed if exceeded.                                          |
-| `dialHeaders`     | map\<string, string\>               | none        | Extra HTTP headers sent during WebSocket upgrade.                                                 |
-| `codec`           | Codec                               | JSONCodec   | Wire-format codec for encoding/decoding Frames. Custom codecs enable binary protocols.            |
+| `writeWait`       | duration                            | 10 s        | Deadline for a single write operation.                                                                                                                                                                         |
+| `maxMessageSize`  | bytes (int)                         | 1 MiB       | Max inbound message size. Connection closed if exceeded.                                                                                                                                                       |
+| `dialHeaders`     | map\<string, string\>               | none        | Extra HTTP headers sent during WebSocket upgrade.                                                                                                                                                              |
+| `codec`           | Codec                               | JSONCodec   | Wire-format codec for encoding/decoding Frames. Custom codecs enable binary protocols.                                                                                                                         |
 
 ---
 
