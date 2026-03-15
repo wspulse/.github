@@ -99,11 +99,30 @@ When `autoReconnect` is disabled:
 
 ## Heartbeat
 
-The wspulse server sends WebSocket **Ping** frames every `pingPeriod` (default 10 s). Clients must respond with a **Pong**.
+wspulse uses a **dual heartbeat** model: both the server and the client independently send WebSocket **Ping** control frames and monitor **Pong** replies to detect dead connections.
 
-- Standard WebSocket libraries handle Pong automatically — do not implement manually unless the library requires it.
-- If the server receives no Pong within `pongWait` (default 30 s), it closes the connection. The client will see a transport drop and (if auto-reconnect is on) reconnect.
-- Client-side `heartbeat` options (`pingPeriod`, `pongWait`) configure the client's _expectation_ of server timing, not a client-initiated Ping.
+### Server-side heartbeat
+
+- The server sends Ping every `pingPeriod` (default **10 s**).
+- If no Pong is received within `pongWait` (default **30 s**), the server closes the connection.
+- Clients auto-reply Pong at the protocol layer (handled by gorilla/websocket, browser engines, and other standard WebSocket libraries).
+
+### Client-side heartbeat
+
+- Native clients (Go, Node.js) **also** send their own Ping every `pingPeriod` (default **20 s**).
+- If no Pong is received within `pongWait` (default **60 s**), the client closes the socket, triggering a transport drop (and reconnect if enabled).
+- The server auto-replies Pong at the protocol layer (gorilla default `PingHandler`).
+- **Browser clients** cannot send Ping frames — the browser WebSocket API provides no programmatic access to Ping/Pong control frames. In browser environments the client-side heartbeat is a **no-op**; liveness detection relies entirely on the server-side heartbeat.
+
+### Why dual heartbeat?
+
+- **Independent fault detection** — each side detects the other's failure on its own schedule without a one-directional dependency.
+- **Staggered defaults** — the server uses a tight interval (10 s / 30 s) for fast resource reclamation; clients use a lenient interval (20 s / 60 s) suited for mobile and spotty networks.
+- **NAT keepalive** — client-initiated Ping keeps NAT/firewall state alive. Some corporate proxies only track client-originated traffic.
+
+### Configurability
+
+Both `pingPeriod` and `pongWait` are fully configurable on each side. Developers should adjust values to match their network environment and resource constraints. The constraint `pingPeriod < pongWait` must always hold.
 
 ---
 
