@@ -38,11 +38,11 @@ The default codec (`JSONCodec`) serializes Frames as JSON text frames. Custom co
 
 The object returned by the entry-point function. Must expose:
 
-| Concept   | Requirement                                                                                     |
-| --------- | ----------------------------------------------------------------------------------------------- |
+| Concept   | Requirement                                                                                                                                                    |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Send**  | Enqueue a Frame for delivery. Returns/throws `ConnectionClosedError` if the client is closed. Returns/throws `SendBufferFullError` if the send buffer is full. |
-| **Close** | Permanently terminate the connection and stop any reconnect loop. Idempotent.                   |
-| **Done**  | A signal (channel / Promise / Event / AsyncStream) that resolves when permanently disconnected. |
+| **Close** | Permanently terminate the connection and stop any reconnect loop. Idempotent.                                                                                  |
+| **Done**  | A signal (channel / Promise / Event / AsyncStream) that resolves when permanently disconnected.                                                                |
 
 ---
 
