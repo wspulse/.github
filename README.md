@@ -1,126 +1,46 @@
-# wspulse
+# wspulse/.github
 
-A modular WebSocket library ecosystem — minimal, production-ready, and easy to integrate. Go server, with first-party clients for Go and TypeScript/JavaScript.
+Organization-level shared resources for the [wspulse](https://github.com/wspulse) ecosystem.
 
-## Modules
+> For the ecosystem overview, see the [org profile page](https://github.com/wspulse).
 
-All modules share [core](https://github.com/wspulse/core) — shared types (`Frame`, `Codec`, sentinel errors) and a Gin-style event router. Zero external dependencies; pulled in automatically.
+## Contents
 
-| Module                                                | Language      | Description                                                                  |
-| ----------------------------------------------------- | ------------- | ---------------------------------------------------------------------------- |
-| [server](https://github.com/wspulse/server)           | Go            | WebSocket server: room routing, session resumption, heartbeat, backpressure. |
-| [client-go](https://github.com/wspulse/client-go)     | Go            | Go client: auto-reconnect, exponential backoff, callbacks.                   |
-| [client-ts](https://github.com/wspulse/client-ts)     | TypeScript/JS | TS/JS client: auto-reconnect, exponential backoff. Browser + Node.js.        |
-
-## At a Glance
-
-### Server
-
-Basic broadcast with session resumption:
-
-```go
-var srv server.Server
-
-srv = server.NewServer(
-    func(r *http.Request) (roomID, connectionID string, err error) {
-        return r.URL.Query().Get("room"), r.URL.Query().Get("uid"), nil
-    },
-    server.WithOnMessage(func(conn server.Connection, f server.Frame) {
-        srv.Broadcast(conn.RoomID(), f)
-    }),
-    server.WithResumeWindow(30 * time.Second),
-)
-http.Handle("/ws", srv)
+```
+.github/
+  workflows/
+    auto-assign.yml       # auto-assign PR author (inherited by all repos)
+    go-ci.yml             # reusable Go CI workflow (fmt → lint → race test)
+profile/
+  README.md               # org profile page (github.com/wspulse)
+doc/
+  contracts/
+    client-interface.md   # client API contract (all languages)
+    client-behaviour.md   # client runtime behaviour contract
+  plan/
+    client-lib-plan.md    # cross-language client plan overview
+    client-ts-plan.md     # TypeScript/JS client development plan
+    client-kt-plan.md     # Kotlin client plan (future)
+    client-swift-plan.md  # Swift client plan (future)
+    client-py-plan.md     # Python client plan (future)
+CONTRIBUTING.md           # org-wide contribution guidelines
+LICENSE                   # MIT
 ```
 
-### Event Routing with `core/router`
+## Inherited Workflows
 
-Both server and client libraries can use `core/router` for Gin-style event dispatching with middleware:
+Workflows under `.github/workflows/` are automatically inherited by all repos in the `wspulse` org (unless overridden locally):
 
-```go
-// ── server side ──
-rtr := router.New()
-rtr.Use(router.Recovery())
+- **auto-assign.yml** — assigns the PR author on open
+- **go-ci.yml** — reusable CI for Go modules (`fmt → lint → test -race`)
 
-rtr.On("chat.message", func(c *router.Context) {
-    srv.Broadcast(c.Connection.RoomID(), c.Frame)
-})
-rtr.On("chat.join", func(c *router.Context) {
-    welcome := server.Frame{Event: "chat.welcome", Payload: []byte(`"hello"`)}
-    c.Connection.Send(welcome)
-})
+## Client Contracts
 
-srv = server.NewServer(connectFunc,
-    server.WithOnMessage(func(conn server.Connection, f server.Frame) {
-        rtr.Dispatch(conn, f) // server.Connection satisfies router.Connection
-    }),
-)
-```
+The `doc/contracts/` directory defines the interface and behaviour contracts that all first-party client libraries must implement:
 
-### Client — Go
-
-```go
-rtr := router.New()
-rtr.Use(router.Recovery())
-
-rtr.On("chat.message", func(c *router.Context) {
-    fmt.Printf("[msg] %s\n", c.Frame.Payload)
-})
-rtr.On("chat.welcome", func(c *router.Context) {
-    fmt.Println("joined!")
-})
-
-c, _ := client.Dial("ws://localhost:8080/ws?room=r1&uid=alice",
-    client.WithOnMessage(func(f wspulse.Frame) {
-        rtr.Dispatch(nil, f) // client has no router.Connection; pass nil
-    }),
-    client.WithAutoReconnect(5, time.Second, 30*time.Second),
-)
-defer c.Close()
-```
-
-### Client — TypeScript/JS
-
-```ts
-import { connect } from "@wspulse/client-ts";
-
-const client = await connect("ws://localhost:8080/ws?room=r1&uid=alice", {
-  onMessage(frame) {
-    console.log(`[${frame.event}]`, frame.payload);
-  },
-  autoReconnect: { maxRetries: 5, baseDelay: 1000, maxDelay: 30_000 },
-});
-
-client.send({ event: "chat.message", payload: { text: "hello" } });
-await client.done;
-```
-
-## Key Features
-
-- **Room-based routing** — connections are partitioned into rooms; broadcast targets a single room
-- **Session resumption** — configurable grace window; transparent WebSocket swap on reconnect
-- **Pluggable codecs** — JSON by default; swap in Protobuf, MessagePack, or any custom encoding
-- **Event router** — Gin-style middleware chain for dispatching frames by event name (`core/router`)
-- **Auto-reconnect** — client-side exponential backoff with configurable retries
-- **Any HTTP router** — standard `http.Handler`; works with net/http, Gin, Chi, Echo, etc.
-- **Cross-platform TS/JS client** — single package for Node.js (`ws`) and browsers (native `WebSocket`)
-
-## Documentation
-
-- [Wire Protocol](https://github.com/wspulse/server/blob/main/doc/protocol.md) — frame format, heartbeat, session resumption
-- [Server Internals](https://github.com/wspulse/server/blob/main/doc/internals.md) — hub event loop, goroutine model, backpressure
-
-## Status
-
-| Module      | Version   |
-| ----------- | --------- |
-| `server`    | **v0.3.0** |
-| `core`      | **v0.2.0** |
-| `client-go` | **v0.2.1** |
-| `client-ts` | **v0.1.0** |
-
-APIs are being stabilized. Breaking changes may occur before v1.
+- [client-interface.md](doc/contracts/client-interface.md) — public API surface (`connect`, `send`, `close`, `done`, options, callbacks)
+- [client-behaviour.md](doc/contracts/client-behaviour.md) — runtime behaviour (reconnect, heartbeat, backpressure, shutdown sequence)
 
 ## License
 
-All modules are released under the [MIT License](https://github.com/wspulse/core/blob/main/LICENSE).
+[MIT](LICENSE)
