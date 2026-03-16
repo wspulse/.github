@@ -40,7 +40,7 @@ The object returned by the entry-point function. Must expose:
 
 | Concept   | Requirement                                                                                     |
 | --------- | ----------------------------------------------------------------------------------------------- |
-| **Send**  | Enqueue a Frame for delivery. Returns/throws `ConnectionClosedError` if the client is closed.   |
+| **Send**  | Enqueue a Frame for delivery. Returns/throws `ConnectionClosedError` if the client is closed. Returns/throws `SendBufferFullError` if the send buffer is full. |
 | **Close** | Permanently terminate the connection and stop any reconnect loop. Idempotent.                   |
 | **Done**  | A signal (channel / Promise / Event / AsyncStream) that resolves when permanently disconnected. |
 
@@ -98,6 +98,7 @@ Each language maps these sentinel concepts to its own error type. The names belo
 | Concept                 | When raised / returned                                                    |
 | ----------------------- | ------------------------------------------------------------------------- |
 | `ConnectionClosedError` | `send()` called after the client is permanently closed.                   |
+| `SendBufferFullError`   | `send()` called when the internal send buffer is full.                    |
 | `RetriesExhaustedError` | Passed to `onDisconnect` when max reconnect retries are exhausted.        |
 | `ConnectionLostError`   | Passed to `onDisconnect` when the server drops and auto-reconnect is off. |
 
@@ -115,5 +116,6 @@ Each language maps these sentinel concepts to its own error type. The names belo
 | Codec interface  | `core.Codec` (Encode/Decode/FrameType) | `Codec` (encode/decode/binaryType) | `Codec` (encode/decode/frameType)        | `WspulseCodec` (encode/decode/frameType) | `Codec` (encode/decode/frame_type)              |
 | Default codec    | `core.JSONCodec`                       | `JSONCodec`                        | `JsonCodec`                              | `JSONCodec`                              | `JSONCodec`                                     |
 | ConnectionClosed | `ErrConnectionClosed` (from core)      | `ConnectionClosedError`            | `ConnectionClosedException`              | `WspulseError.connectionClosed`          | `ConnectionClosedError`                         |
+| SendBufferFull   | `ErrSendBufferFull` (from core)        | `SendBufferFullError`              | `SendBufferFullException`                | `WspulseError.sendBufferFull`            | `SendBufferFullError`                           |
 | RetriesExhausted | `ErrRetriesExhausted`                  | `RetriesExhaustedError`            | `RetriesExhaustedException`              | `WspulseError.retriesExhausted`          | `RetriesExhaustedError`                         |
 | ConnectionLost   | `ErrConnectionLost`                    | `ConnectionLostError`              | `ConnectionLostException`                | `WspulseError.connectionLost`            | `ConnectionLostError`                           |

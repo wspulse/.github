@@ -92,7 +92,7 @@ When `autoReconnect` is disabled:
 - Enqueues the encoded frame into a bounded internal buffer.
 - Returns/resolves immediately (non-blocking).
 - Raises `ConnectionClosedError` if the client is in `CLOSED` state.
-- If the buffer is full: the **oldest** frame is dropped (head-drop). This matches server backpressure behaviour.
+- If the buffer is full: raises `SendBufferFullError`. The caller decides how to handle backpressure (retry, discard, or close). Note: server-side broadcast uses head-drop for 1:N fanout; client-side send is 1:1 and must not silently discard frames.
 - Frames are delivered in enqueue order. No reordering.
 
 ---
