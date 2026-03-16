@@ -1,15 +1,16 @@
 # wspulse
 
-A modular WebSocket library ecosystem for Go — minimal, production-ready, and easy to integrate with any HTTP router.
+A modular WebSocket library ecosystem — minimal, production-ready, and easy to integrate. Go server, with first-party clients for Go and TypeScript/JavaScript.
 
 ## Modules
 
 All modules share [core](https://github.com/wspulse/core) — shared types (`Frame`, `Codec`, sentinel errors) and a Gin-style event router. Zero external dependencies; pulled in automatically.
 
-| Module                                            | Description                                                                  |
-| ------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [server](https://github.com/wspulse/server)       | WebSocket server: room routing, session resumption, heartbeat, backpressure. |
-| [client-go](https://github.com/wspulse/client-go) | Go client: auto-reconnect, exponential backoff, callbacks.                   |
+| Module                                                | Language      | Description                                                                  |
+| ----------------------------------------------------- | ------------- | ---------------------------------------------------------------------------- |
+| [server](https://github.com/wspulse/server)           | Go            | WebSocket server: room routing, session resumption, heartbeat, backpressure. |
+| [client-go](https://github.com/wspulse/client-go)     | Go            | Go client: auto-reconnect, exponential backoff, callbacks.                   |
+| [client-ts](https://github.com/wspulse/client-ts)     | TypeScript/JS | TS/JS client: auto-reconnect, exponential backoff. Browser + Node.js.        |
 
 ## At a Glance
 
@@ -78,6 +79,22 @@ c, _ := client.Dial("ws://localhost:8080/ws?room=r1&uid=alice",
 defer c.Close()
 ```
 
+### Client — TypeScript/JS
+
+```ts
+import { connect } from "@wspulse/client-ts";
+
+const client = await connect("ws://localhost:8080/ws?room=r1&uid=alice", {
+  onMessage(frame) {
+    console.log(`[${frame.event}]`, frame.payload);
+  },
+  autoReconnect: { maxRetries: 5, baseDelay: 1000, maxDelay: 30_000 },
+});
+
+client.send({ event: "chat.message", payload: { text: "hello" } });
+await client.done;
+```
+
 ## Key Features
 
 - **Room-based routing** — connections are partitioned into rooms; broadcast targets a single room
@@ -86,6 +103,7 @@ defer c.Close()
 - **Event router** — Gin-style middleware chain for dispatching frames by event name (`core/router`)
 - **Auto-reconnect** — client-side exponential backoff with configurable retries
 - **Any HTTP router** — standard `http.Handler`; works with net/http, Gin, Chi, Echo, etc.
+- **Cross-platform TS/JS client** — single package for Node.js (`ws`) and browsers (native `WebSocket`)
 
 ## Documentation
 
@@ -94,7 +112,14 @@ defer c.Close()
 
 ## Status
 
-All modules are at **v0.2.0** — API is being stabilized. Breaking changes may occur before v1.
+| Module      | Version   |
+| ----------- | --------- |
+| `server`    | **v0.3.0** |
+| `core`      | **v0.2.0** |
+| `client-go` | **v0.2.1** |
+| `client-ts` | **v0.1.0** |
+
+APIs are being stabilized. Breaking changes may occur before v1.
 
 ## License
 
