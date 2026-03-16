@@ -1,7 +1,7 @@
 # wspulse TypeScript Client — Development Plan (`client-ts`)
 
-> Status: P1–P5 complete · Last updated: 2026-03-15
-> Repo: `wspulse/client-ts` · Package: `@wspulse/client`
+> Status: P1–P6 complete · Last updated: 2026-03-16
+> Repo: `wspulse/client-ts` · Package: `@wspulse/client-ts`
 
 **Read before starting:**
 
@@ -145,9 +145,9 @@ client-ts/
 - [x] **`maxMessageSize`**: enforced in `onmessage` via `String(ev.data).length` check; closes with code 1009 and triggers `handleTransportDrop()` directly (detaches `onclose` first to avoid double-fire).
 - [x] Document browser limitation: `dialHeaders` is **not supported** in the browser WebSocket API (documented in README).
 
-### P5 — Test Suite (partially complete)
+### P5 — Test Suite ✅
 
-34 tests passing across 5 test files. Scenarios 1–7 and 9 covered using lightweight `ws.WebSocketServer` echo servers (no live `wspulse/server` required). Scenario 8 is N/A for single-threaded JS.
+44 tests passing across 6 test files. Scenarios 1–7 and 9 covered using lightweight `ws.WebSocketServer` echo servers (no live `wspulse/server` required). Scenario 8 is N/A for single-threaded JS.
 
 | #   | Scenario                                                      | Status                                         |
 | --- | ------------------------------------------------------------- | ---------------------------------------------- |
@@ -177,10 +177,13 @@ Additional tests: done resolution, close idempotency, head-drop on buffer overfl
 
 ---
 
-## Publish Checklist (P6)
+## Publish Checklist (P6) ✅
 
 - [x] README: quick-start (browser + Node.js examples)
 - [x] CHANGELOG.md with version 0.1.0 entry
-- [ ] `npm publish --access public --provenance` from CI on git tag
-- [ ] GitHub release with NPM badge
-- [ ] Register package at [npmjs.com](https://npmjs.com)
+- [x] Renamed package to `@wspulse/client-ts`
+- [x] `npm publish --access public --provenance` from CI on git tag `v0.1.0`
+- [x] Register package at [npmjs.com](https://npmjs.com) — published as `@wspulse/client-ts@0.1.0`
+- [x] GitHub release v0.1.0
+- [x] Add NPM badge to README
+- [ ] Rotate `NPM_TOKEN` secret before 2026-06-14 expiry
