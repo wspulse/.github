@@ -165,6 +165,20 @@ Additional tests: done resolution, close idempotency, head-drop on buffer overfl
 
 - [x] P5 stretch: integration tests against a live `wspulse/server` instance (vitest globalSetup with `go run .`) — 6 tests via `testserver/` Go program
 
+### Integration Test Gap
+
+Unit tests (via lightweight `ws.WebSocketServer` mocks) cover all 9 scenarios. However, the 6 **integration tests** against a live `wspulse/server` only cover basic echo/reject/ordering — they do not exercise reconnect or heartbeat paths against the real server.
+
+The current `client-ts/testserver/` is a simple echo+reject server with no ability to trigger server-initiated disconnects. To test scenarios 3–5 against a live server, the testserver needs kick/shutdown/restart capabilities.
+
+**Plan:** migrate to the [shared testserver](testserver-plan.md) with an HTTP control API, then add integration tests:
+
+- [ ] Migrate to shared testserver (see [testserver-plan.md](testserver-plan.md) Step 3)
+- [ ] Integration scenario 3: kick → verify reconnect → verify echo resumes
+- [ ] Integration scenario 4: shutdown → verify `onDisconnect(RetriesExhaustedError)`
+- [ ] Integration scenario 5: kick → call `close()` during reconnect → verify `onDisconnect(null)`
+- [ ] Delete `client-ts/testserver/` after migration
+
 ---
 
 ## Key Implementation Notes

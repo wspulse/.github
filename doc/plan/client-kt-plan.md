@@ -141,8 +141,22 @@ Actual shipped dependencies (v0.2.0):
 - [x] CHANGELOG.md with v0.1.0 and v0.2.0 entries
 - [x] CD workflow on git tag → GitHub Release (auto-generated notes)
 - [x] JitPack badge on README; published at `com.github.wspulse:client-kt`
-- [ ] Maven Central publish — **not done** (decision: JitPack used instead)
-- [ ] GPG signing — **not done** (JitPack does not require it)
+- [x] ~~Maven Central publish~~ — N/A (JitPack used instead)
+- [x] ~~GPG signing~~ — N/A (JitPack does not require signing)
+
+### P7 — Integration Test Gap (scenarios 3, 4, 5) ⬜
+
+The current testserver (`client-kt/testserver/`) is a simple echo+reject server with no ability to trigger server-initiated disconnects. Scenarios 3 (auto-reconnect success), 4 (max retries exhausted), and 5 (close during reconnect) require the test harness to **kick connections** and **shut down / restart the server** on demand.
+
+client-go covers these scenarios because it embeds `wspulse/server` in-process via `httptest.NewServer` and calls `srv.Kick()` / `srv.Close()` directly. Non-Go clients need an external testserver with HTTP control endpoints.
+
+**Plan:** migrate to the [shared testserver](testserver-plan.md) with an HTTP control API (`/kick`, `/shutdown`, `/restart`), then add integration tests:
+
+- [ ] Migrate to shared testserver (see [testserver-plan.md](testserver-plan.md) Step 2)
+- [ ] Scenario 3: kick → verify `onReconnect(0)` → verify message delivery resumes
+- [ ] Scenario 4: shutdown → verify `onDisconnect(RetriesExhaustedException)` fires exactly once
+- [ ] Scenario 5: kick → call `close()` before reconnect completes → verify `onDisconnect(null)`
+- [ ] Scenario 7 (pong timeout): deferred — requires testserver `?ignore_pings=1` support
 
 ---
 
