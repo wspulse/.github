@@ -1,6 +1,6 @@
 # wspulse
 
-A modular WebSocket library ecosystem — minimal, production-ready, and easy to integrate. Go server, with first-party clients for Go and TypeScript/JavaScript.
+A modular WebSocket library ecosystem — minimal, production-ready, and easy to integrate. Go server, with first-party clients for Go, TypeScript/JavaScript, and Kotlin/Android.
 
 ## Architecture
 
@@ -10,9 +10,11 @@ graph LR
     server["<b>server</b><br/>Server · Connection · Hub"]
     client-go["<b>client-go</b><br/>Client · Dial · Backoff"]
     client-ts["<b>client-ts</b><br/>Client · Connect · Backoff"]
+    client-kt["<b>client-kt</b><br/>Client · Connect · Backoff"]
     server --> core
     client-go --> core
     client-ts -. "same wire protocol" .-> server
+    client-kt -. "same wire protocol" .-> server
 ```
 
 | Module                                            | Language      | Description                                                                                              |
@@ -21,6 +23,7 @@ graph LR
 | [server](https://github.com/wspulse/server)       | Go            | WebSocket server: room routing, session resumption, heartbeat, backpressure.                             |
 | [client-go](https://github.com/wspulse/client-go) | Go            | Go client: auto-reconnect, exponential backoff, lifecycle callbacks.                                     |
 | [client-ts](https://github.com/wspulse/client-ts) | TypeScript/JS | TS/JS client: auto-reconnect, exponential backoff. Browser + Node.js.                                    |
+| [client-kt](https://github.com/wspulse/client-kt) | Kotlin        | Kotlin/JVM + Android client: auto-reconnect, exponential backoff. Ktor CIO + coroutines.                 |
 
 ## Where to Start
 
@@ -29,6 +32,7 @@ graph LR
 | Build a WebSocket server     | [server README](https://github.com/wspulse/server#readme)                               |
 | Connect from Go              | [client-go README](https://github.com/wspulse/client-go#readme)                         |
 | Connect from TypeScript/JS   | [client-ts README](https://github.com/wspulse/client-ts#readme)                         |
+| Connect from Kotlin/Android  | [client-kt README](https://github.com/wspulse/client-kt#readme)                         |
 | Route frames by event name   | [core/router](https://github.com/wspulse/core#router)                                   |
 | Understand the wire protocol | [server/doc/protocol.md](https://github.com/wspulse/server/blob/main/doc/protocol.md)   |
 | Understand server internals  | [server/doc/internals.md](https://github.com/wspulse/server/blob/main/doc/internals.md) |
@@ -46,7 +50,7 @@ graph LR
 
 ## Roadmap
 
-First-party client libraries are planned for Kotlin, Swift, and Python — all implementing the same [wire protocol](https://github.com/wspulse/server/blob/main/doc/protocol.md) and [behaviour contract](doc/contracts/client-behaviour.md).
+First-party client libraries are planned for Swift and Python — all implementing the same [wire protocol](https://github.com/wspulse/server/blob/main/doc/protocol.md) and [behaviour contract](doc/contracts/client-behaviour.md).
 
 ## Status
 
@@ -56,6 +60,7 @@ First-party client libraries are planned for Kotlin, Swift, and Python — all i
 | `core`      | **v0.2.0** |
 | `client-go` | **v0.2.1** |
 | `client-ts` | **v0.1.0** |
+| `client-kt` | **v0.2.0** |
 
 APIs are being stabilized. Breaking changes may occur before v1.
 

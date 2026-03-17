@@ -1,7 +1,7 @@
 # wspulse Kotlin Client — Development Plan (`client-kt`)
 
-> Status: planned · Last updated: 2026-03-13
-> Repo: `wspulse/client-kt` · Package: `com.wspulse:client-kt`
+> Status: **shipped v0.2.0** · Last updated: 2026-03-17
+> Repo: `wspulse/client-kt` · Package: `com.github.wspulse:client-kt` (JitPack)
 
 **Read before starting:**
 
@@ -14,12 +14,12 @@
 
 ## Environments
 
-| Target  | Min version | Transport            |
-| ------- | ----------- | -------------------- |
-| JVM     | Java 11     | OkHttp 4.x WebSocket |
-| Android | API 26+     | OkHttp 4.x WebSocket |
+| Target  | Min version | Transport          |
+| ------- | ----------- | ------------------ |
+| JVM     | Java 17     | Ktor CIO WebSocket |
+| Android | API 26+     | Ktor CIO WebSocket |
 
-Coroutine model: **kotlinx.coroutines** — all public API is `suspend fun` or returns `Deferred`/`Flow`.
+Coroutine model: **kotlinx.coroutines** — all public API is `suspend fun` or non-blocking with `Deferred`.
 
 ---
 
@@ -29,200 +29,131 @@ Coroutine model: **kotlinx.coroutines** — all public API is `suspend fun` or r
 client-kt/
   src/
     main/kotlin/com/wspulse/client/
-      WspulseClient.kt        # main class + companion object factory
-      Frame.kt                # @Serializable data class Frame
+      WspulseClient.kt        # Client interface + WspulseClient implementation
+      Frame.kt                # data class Frame(id, event, payload: Any?)
       ClientConfig.kt         # ClientConfig builder DSL
-      Errors.kt               # WspulseException hierarchy
+      Codec.kt                # Codec interface + JsonCodec (org.json)
+      Errors.kt               # WspulseException sealed hierarchy
       Backoff.kt              # backoff(attempt, base, max): Duration
     test/kotlin/com/wspulse/client/
-      BackoffTest.kt          # unit tests — backoff formula
-      ClientTest.kt           # integration tests against wspulse/server
+      BackoffTest.kt          # unit tests — backoff formula (4 tests)
+      CodecTest.kt            # unit tests — JsonCodec (9 tests)
+      ConfigValidationTest.kt # unit tests — config validation (15 tests)
+      ClientIntegrationTest.kt # integration tests vs Go testserver (9 tests)
+      WspulseClientResourceTest.kt # resource/lifecycle tests
+  testserver/
+    main.go                   # Go echo + reject testserver
+    go.mod / go.sum
   build.gradle.kts
   settings.gradle.kts
-  gradle/
-    wrapper/
-      gradle-wrapper.properties
+  gradle/libs.versions.toml
+  Makefile
   .github/
     workflows/
-      ci.yml                  # build + lint + test on JDK 21
+      ci.yml                  # lint + test on JDK 17 + 21 matrix
+      cd.yml                  # GitHub Release on git tag
 ```
 
 ---
 
 ## Dependencies
 
-| Artifact                                           | Version  | Scope              |
-| -------------------------------------------------- | -------- | ------------------ |
-| `com.squareup.okhttp3:okhttp`                      | `4.12.x` | api                |
-| `org.jetbrains.kotlinx:kotlinx-coroutines-core`    | `1.9.x`  | api                |
-| `org.jetbrains.kotlinx:kotlinx-serialization-json` | `1.7.x`  | api                |
-| `org.junit.jupiter:junit-jupiter`                  | `5.11.x` | testImplementation |
-| `org.jetbrains.kotlinx:kotlinx-coroutines-test`    | `1.9.x`  | testImplementation |
+Actual shipped dependencies (v0.2.0):
+
+| Artifact                                        | Version    | Scope              |
+| ----------------------------------------------- | ---------- | ------------------ |
+| `org.jetbrains.kotlinx:kotlinx-coroutines-core` | `1.10.2`   | api                |
+| `org.slf4j:slf4j-api`                           | `2.0.16`   | api                |
+| `io.ktor:ktor-client-cio`                       | `3.4.1`    | implementation     |
+| `io.ktor:ktor-client-websockets`                | `3.4.1`    | implementation     |
+| `org.json:json`                                 | `20240303` | implementation     |
+| `org.junit.jupiter:junit-jupiter`               | `5.11.4`   | testImplementation |
+| `org.jetbrains.kotlinx:kotlinx-coroutines-test` | `1.10.2`   | testImplementation |
+
+> Note: OkHttp and kotlinx-serialization were **not used**. Transport is Ktor CIO; serialisation is org.json (custom `JsonCodec`).
 
 ---
 
 ## Phase Breakdown
 
-### P1 — Project Scaffold
+### P1 — Project Scaffold ✅
 
-- [ ] Create repo `wspulse/client-kt`
-- [ ] `settings.gradle.kts`: `rootProject.name = "client-kt"`, `includeBuild(".")` for local dev
-- [ ] `build.gradle.kts`:
-  - Kotlin JVM 2.0, `jvmTarget = JavaVersion.VERSION_11`
-  - Plugins: `kotlin("jvm")`, `kotlin("plugin.serialization")`, `maven-publish`, `signing`
-  - All dependencies listed above
-  - Maven Central publish config (`groupId = "com.wspulse"`, `artifactId = "client-kt"`)
-- [ ] Gradle wrapper at Gradle 8.10
-- [ ] CI workflow: `./gradlew check` on JDK 21
+- [x] Create repo `wspulse/client-kt`
+- [x] `settings.gradle.kts`: `rootProject.name = "client-kt"`
+- [x] `build.gradle.kts`:
+  - Kotlin JVM 2.3.0 (≠ plan's 2.0), `jvmToolchain(17)` (≠ plan's Java 11)
+  - Plugins: `kotlin("jvm")`, `ktlint`, `jacoco`, `maven-publish`
+  - No `kotlin("plugin.serialization")` — org.json used instead
+  - JitPack publishing (≠ plan's Maven Central)
+- [x] Gradle wrapper at Gradle 8.12
+- [x] CI workflow: `./gradlew check` on JDK 17 + 21 matrix
+- [x] CD workflow: GitHub Release on git tag (no Maven Central publish)
+- [x] Makefile with `check`, `test`, `lint`, `fmt`, `test-cover`, `test-integration`, `clean`
 
-### P2 — Connect / Send / Close / Done
+### P2 — Connect / Send / Close / Done ✅
 
-- [ ] **`Frame.kt`**:
+- [x] **`Frame.kt`**: `data class Frame(id, event, payload: Any?)` — `payload` is `Any?` (not `JsonElement?`); org.json used instead of kotlinx-serialization
+- [x] **`Codec.kt`**: `Codec` interface + `JsonCodec` using org.json; `FrameType` enum
+- [x] **`Errors.kt`**: `sealed class WspulseException`; added `SendBufferFullException` (not in plan); `ConnectionClosedException`, `RetriesExhaustedException(attempts)`, `ConnectionLostException(cause?)`
+- [x] **`ClientConfig.kt`**: builder DSL with `autoReconnect`, `heartbeat`, `writeWait`, `maxMessageSize`, `dialHeaders`; all callbacks present
+- [x] **`WspulseClient.kt`**: `Client` interface + `WspulseClient` implementation
+  - `connect()` ✅, `send()` (non-blocking, throws `SendBufferFullException` on full) ✅, `close()` ✅, `done: Deferred<Unit>` ✅
+  - Send buffer: `Channel<ByteArray>(256)` — throws `SendBufferFullException` instead of `DROP_OLDEST` (≠ plan; aligned with client-go contract)
+  - Scope: `CoroutineScope(SupervisorJob() + Dispatchers.IO)` ✅
 
-  ```kotlin
-  @Serializable
-  data class Frame(
-      val id: String? = null,
-      val event: String? = null,
-      val payload: JsonElement? = null,  // JsonElement covers any JSON value
-  )
-  ```
+### P3 — Auto-Reconnect + Backoff ✅
 
-- [ ] **`Errors.kt`** — sealed exception hierarchy:
+- [x] **`Backoff.kt`**: `internal fun backoff(attempt, base, max): Duration` with equal jitter — matches client-go formula ✅
+- [x] Reconnect loop: exponential backoff, `maxRetries` limit, `onReconnect`, `onDisconnect(RetriesExhaustedException)` ✅
+- [x] `close()` during reconnect → `onDisconnect(null)` ✅
 
-  ```kotlin
-  sealed class WspulseException(msg: String) : Exception(msg)
-  class ConnectionClosedException : WspulseException("connection is closed")
-  class RetriesExhaustedException : WspulseException("max reconnect retries exhausted")
-  class ConnectionLostException : WspulseException("connection lost")
-  ```
+### P4 — Heartbeat + Write Deadline ✅
 
-- [ ] **`ClientConfig.kt`** — builder DSL:
+- [x] Heartbeat: Ktor CIO `pingInterval` / `pingWait` (not OkHttp `pingIntervalMillis`) ✅
+- [x] `writeWait`: `withTimeout(writeWait)` around Ktor send ✅
+- [x] `maxMessageSize`: close with code 1009 when exceeded ✅
 
-  ```kotlin
-  class ClientConfig {
-      var onMessage: (Frame) -> Unit = {}
-      var onDisconnect: (WspulseException?) -> Unit = {}
-      var onReconnect: (attempt: Int) -> Unit = {}
-      var onTransportDrop: (Exception) -> Unit = {}
-      var autoReconnect: AutoReconnectConfig? = null  // null = disabled
-      var heartbeat: HeartbeatConfig = HeartbeatConfig()
-      var writeWait: Duration = 10.seconds
-      var maxMessageSize: Long = 1 * 1024 * 1024
-      var dialHeaders: Map<String, String> = emptyMap()
-  }
-  data class AutoReconnectConfig(val maxRetries: Int, val baseDelay: Duration, val maxDelay: Duration)
-  data class HeartbeatConfig(val pingPeriod: Duration = 20.seconds, val pongWait: Duration = 60.seconds)
-  ```
+### P5 — Test Suite ✅ (partially covers plan scenarios)
 
-- [ ] **`WspulseClient.kt`** — class with companion factory:
+9 integration tests + 4 backoff unit tests + 9 codec unit tests + 15 config validation tests + resource tests:
 
-  ```kotlin
-  class WspulseClient private constructor(
-      private val url: String,
-      private val config: ClientConfig,
-  ) {
-      val done: CompletableDeferred<Unit> = CompletableDeferred()
+| Plan # | Scenario                                          | Status                                                          |
+| ------ | ------------------------------------------------- | --------------------------------------------------------------- |
+| 1      | Connect → send → echo → close clean               | ✅ `connects, sends a frame, receives echo, and closes cleanly` |
+| 2      | Server drops → onTransportDrop + onDisconnect     | ✅ `onDisconnect fires exactly once on close`                   |
+| 3      | Auto-reconnect: reconnects within maxRetries      | ❌ Not directly tested (reconnect integration test missing)     |
+| 4      | Max retries exhausted → RetriesExhaustedException | ❌ Not directly tested                                          |
+| 5      | `close()` during reconnect → onDisconnect(null)   | ❌ Not directly tested                                          |
+| 6      | `send()` on closed → ConnectionClosedException    | ✅ `send after close throws ConnectionClosedException`          |
+| 7      | No pong within pongWait → reconnect               | ❌ Not directly tested                                          |
+| 8      | Concurrent sends: no race                         | ✅ `concurrent sends do not race`                               |
+| —      | Round-trip all Frame fields                       | ✅ `round-trips all Frame fields (id, event, payload)`          |
+| —      | Server rejection                                  | ✅ `handles server rejection gracefully`                        |
+| —      | Room routing via query param                      | ✅ `connects to a specific room via query param`                |
+| —      | Close is idempotent                               | ✅ `close is idempotent`                                        |
+| —      | Multiple concurrent sends in order                | ✅ `sends multiple frames and receives them in order`           |
 
-      suspend fun send(frame: Frame): Unit { ... }
-      suspend fun close(): Unit { ... }
+> Scenarios 3, 4, 5, 7 (reconnect/heartbeat edge-cases) have no integration test. This is the primary gap vs the plan.
 
-      companion object {
-          suspend fun connect(url: String, config: ClientConfig.() -> Unit = {}): WspulseClient { ... }
-      }
-  }
-  ```
+### P6 — Publish ✅ (via JitPack, not Maven Central)
 
-- [ ] Internal send buffer: `Channel<ByteArray>(capacity = 256, onBufferOverflow = DROP_OLDEST)`
-  - Kotlin `Channel` with `DROP_OLDEST` handles head-drop natively.
-
-- [ ] On initial connect failure (no autoReconnect): throw `ConnectionLostException`.
-
-- [ ] `send()`:
-  1. Check `done.isCompleted` → throw `ConnectionClosedException`
-  2. JSON-encode `Frame` via `Json.encodeToString()`
-  3. `channel.trySend(bytes)` (non-blocking due to DROP_OLDEST)
-
-- [ ] `close()`:
-  1. Set closed flag
-  2. Cancel internal coroutine scope
-  3. Close OkHttp WebSocket with code 1000
-  4. Await `done` (it will be completed by the teardown path)
-
-- [ ] Write coroutine: consume `channel`, send via `webSocket.send(ByteString)` inside `withTimeout(writeWait)`
-
-### P3 — Auto-Reconnect + Backoff
-
-- [ ] **`Backoff.kt`**:
-
-  ```kotlin
-  fun backoff(attempt: Int, base: Duration, max: Duration): Duration {
-      val shift = minOf(attempt, 62)
-      val raw = minOf(base * (1L shl shift), max)
-      val jitter = 0.8 + Random.nextDouble() * 0.4
-      return raw * jitter
-  }
-  ```
-
-- [ ] Internal `CoroutineScope(SupervisorJob() + Dispatchers.IO)` owns all goroutines
-- [ ] Reconnect loop (coroutine):
-  1. Await `droppedChannel` signal from OkHttp `onFailure`/`onClosed`
-  2. Check closed flag → exit
-  3. Fire `config.onTransportDrop(err)` (only on unexpected drop)
-  4. `delay(backoff(attempt, base, max))`
-  5. Fire `config.onReconnect(attempt)`
-  6. Try `dial()`:
-     - Success → reset `attempt`, resume send coroutine with new `webSocket`
-     - Fail → `attempt++`; if `attempt >= maxRetries > 0` → fire `onDisconnect(RetriesExhaustedException())` → `done.complete(Unit)` → exit
-  7. Go to step 1
-
-- [ ] `close()` during reconnect: cancel the coroutine scope; `CancellationException` is caught in the loop → fire `onDisconnect(null)` → `done.complete(Unit)`
-
-### P4 — Heartbeat + Write Deadline
-
-- [ ] **OkHttp Pong**: `WebSocketListener.onMessage` does not handle pings; OkHttp replies automatically — no manual handling.
-- [ ] **`pongWait`**: when OkHttp fires `onMessage(webSocket, text)`, also schedule a `withTimeout(pongWait)` coroutine. OkHttp does not expose ping/pong events directly — use `webSocket.send(ByteString.EMPTY)` as a ping and check `onMessage` / `onFailure` timing. _Alternative_: rely on OkHttp's built-in `pingIntervalMillis` config.
-  - **Recommended**: pass `OkHttpClient.Builder().pingInterval(pingPeriod)` to OkHttp; this causes OkHttp to send pings automatically and close the connection if no pong arrives within `pongWait`. Document this in the README.
-- [ ] **`writeWait`**: wrap `webSocket.send()` in `withTimeout(writeWait)`.
-- [ ] **`maxMessageSize`**: check `text.length` or `bytes.byteLength` in `onMessage`; if exceeded, call `webSocket.cancel()`.
-
-### P5 — Test Suite
-
-All 8 shared scenarios from the behaviour contract:
-
-| #   | Scenario                                                          | Test approach                                                                             |
-| --- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 1   | Connect → send → echo → close clean                               | `runTest { }` block; start local server via `ProcessBuilder`; assert `onDisconnect(null)` |
-| 2   | Server drops → onTransportDrop + onDisconnect                     | Server force-closes; verify callback order with `CompletableDeferred` collect             |
-| 3   | Auto-reconnect: reconnects within maxRetries                      | Server drops once; assert `onReconnect(0)` then successful message                        |
-| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedException)` | Always-fail server; `maxRetries=2`                                                        |
-| 5   | `close()` during reconnect → `onDisconnect(null)`                 | Call `close()` in `onTransportDrop` callback                                              |
-| 6   | `send()` on closed → `ConnectionClosedException`                  | Call `send()` after `close()`; catch exception                                            |
-| 7   | No pong within pongWait → reconnect                               | Use OkHttp `pingInterval` + short `pongWait`; server ignores pings                        |
-| 8   | Concurrent sends: no race                                         | Launch 100 coroutines all calling `send()`; verify delivery order                         |
-
-- Test infra: start `wspulse/server` with `ProcessBuilder` in `@BeforeAll`; shut down with `process.destroy()` in `@AfterAll`
-- Use `kotlinx-coroutines-test` `runTest` for all async tests
+- [x] README with quick-start, Android ViewModel example, API reference
+- [x] CHANGELOG.md with v0.1.0 and v0.2.0 entries
+- [x] CD workflow on git tag → GitHub Release (auto-generated notes)
+- [x] JitPack badge on README; published at `com.github.wspulse:client-kt`
+- [ ] Maven Central publish — **not done** (decision: JitPack used instead)
+- [ ] GPG signing — **not done** (JitPack does not require it)
 
 ---
 
-## Key Implementation Notes
+## Deviations from Original Plan
 
-1. **OkHttp WebSocket is callback-based**, not coroutine-native. Bridge via `Channel` and `CompletableDeferred`:
-   - `onOpen` → complete a `connectedDeferred`
-   - `onMessage` → decode + call `onMessage` callback
-   - `onFailure` / `onClosed` → send to `droppedChannel`
-2. **Serialisation**: use `kotlinx.serialization` with `Json { ignoreUnknownKeys = true }`. `payload` field typed as `JsonElement?` preserves arbitrary JSON without pre-defining structure.
-3. **`Channel(DROP_OLDEST)`**: Kotlin `Channel` with `BUFFERED` capacity and `DROP_OLDEST` overflow strategy is the idiomatic head-drop implementation — mirrors the Go `send` channel with manual head-drop.
-4. **Thread safety**: OkHttp callbacks run on OkHttp's thread pool; all state mutations go through the coroutine scope (post to the scope's dispatcher). Never touch shared state directly from OkHttp callbacks.
-5. **Jetpack compatibility (Android)**: all public API is dispatcher-agnostic — callers inject context via `withContext(Dispatchers.Main)` in their own code. Do not `Dispatchers.Main` internally.
-
----
-
-## Publish Checklist (P6)
-
-- [ ] README: quick-start + builder DSL example
-- [ ] CHANGELOG.md with 0.1.0 entry
-- [ ] `./gradlew publishToSonatype closeAndReleaseStagingRepository` via CI on git tag
-- [ ] GitHub release with Maven Central badge
-- [ ] Sign artifacts with GPG key stored as GitHub Actions secret
+| Area                 | Plan                                | Actual                                      |
+| -------------------- | ----------------------------------- | ------------------------------------------- |
+| Transport            | OkHttp 4.x                          | Ktor CIO                                    |
+| Serialisation        | kotlinx-serialization (JsonElement) | org.json (custom JsonCodec, `Any?` payload) |
+| JVM minimum          | Java 11                             | Java 17                                     |
+| Kotlin version       | 2.0                                 | 2.3.0                                       |
+| Publishing           | Maven Central + GPG signing         | JitPack (no signing required)               |
+| Send buffer overflow | DROP_OLDEST                         | Throw `SendBufferFullException`             |
+| SLF4J logging        | Not planned                         | Added as `api` dep in v0.2.0                |
