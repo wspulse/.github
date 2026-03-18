@@ -1,6 +1,6 @@
 # wspulse Shared Test Server — Development Plan (`testserver`)
 
-> Status: planned · Last updated: 2026-03-17
+> Status: steps 1–3 complete · Last updated: 2026-03-18
 > Location: `wspulse/testserver/` (workspace root)
 
 ---
@@ -103,42 +103,44 @@ All inbound frames are echoed back to sender.
 | 3   | Auto-reconnect success     | `POST /kick?id=X`                             | Server stays up; client reconnects to same server                 |
 | 4   | Max retries exhausted      | `POST /shutdown`                              | All dial attempts fail; `onDisconnect(RetriesExhausted)`          |
 | 5   | `close()` during reconnect | `POST /kick?id=X` then client calls `close()` | Same as #3 setup; test calls `close()` before reconnect completes |
-| 7   | Pong timeout               | Future: `?ignore_pings=1` query param         | Requires per-conn `SetPingHandler` override; deferred             |
+| 7   | Pong timeout               | `?ignore_pings=1` query param                 | Bypasses wspulse/server; raw gorilla echo with suppressed Pong    |
 
-### Scenario 7 — Deferred
+### Scenario 7 — Done ✅
 
-Suppressing pong requires overriding gorilla/websocket's `SetPingHandler` at the per-connection level. This can be done inside `wspulse/server`'s `WithOnConnect` by accessing the underlying `*websocket.Conn`, but it depends on internal server API that may not be exposed. Defer until the server exposes a hook or the testserver embeds gorilla directly.
+Implemented via `?ignore_pings=1` query parameter. Connections with this parameter bypass `wspulse/server` entirely — the testserver upgrades with raw gorilla/websocket, overrides `SetPingHandler` to suppress Pong replies, and runs a simple echo loop. Both client-ts and client-kt have integration tests verifying pong timeout → `ConnectionLostError` / `ConnectionLostException`.
 
 ---
 
 ## Migration Steps
 
-### Step 1 — Build shared testserver
+### Step 1 — Build shared testserver ✅
 
-- [ ] Create `testserver/` at workspace root
-- [ ] `go.mod`: `module github.com/wspulse/testserver`, depend on `github.com/wspulse/server`
-- [ ] Implement dual-port main.go with control API
-- [ ] Verify: `go build ./testserver && ./testserver` prints `READY:<ws>:<ctl>`
-- [ ] Verify: existing echo + reject behaviour works
+- [x] Create `testserver/` at workspace root
+- [x] `go.mod`: `module github.com/wspulse/testserver`, depend on `github.com/wspulse/server`
+- [x] Implement dual-port main.go with control API
+- [x] Verify: `go build ./testserver && ./testserver` prints `READY:<ws>:<ctl>`
+- [x] Verify: existing echo + reject behaviour works
 
-### Step 2 — Migrate client-kt
+### Step 2 — Migrate client-kt ✅
 
-- [ ] Update `ProcessBuilder` in `ClientIntegrationTest.kt` to point to `../testserver`
-- [ ] Parse `READY:<ws>:<ctl>` to get both ports
-- [ ] Add helper function `controlPost(path, params)` for HTTP calls to control port
-- [ ] Add integration tests for scenarios 3, 4, 5
-- [ ] Delete `client-kt/testserver/`
-- [ ] Update `Makefile` to build shared testserver
-- [ ] Update CI workflow
+- [x] Update `ProcessBuilder` in `ClientIntegrationTest.kt` to point to `../testserver`
+- [x] Parse `READY:<ws>:<ctl>` to get both ports
+- [x] Add helper function `controlPost(path, params)` for HTTP calls to control port
+- [x] Add kick test (server-initiated disconnect via control API)
+- [x] Add integration tests for scenarios 3, 4, 5
+- [x] Delete `client-kt/testserver/`
+- [x] Update `Makefile` to build shared testserver
+- [x] Update CI workflow
 
-### Step 3 — Migrate client-ts
+### Step 3 — Migrate client-ts ✅
 
-- [ ] Update `test/global-setup.ts` to point to `../testserver`
-- [ ] Parse `READY:<ws>:<ctl>` to get both ports; write both to `.server-url` / `.control-url`
-- [ ] Add helper function for HTTP calls to control port
-- [ ] Add integration tests for scenarios 3, 4, 5
-- [ ] Delete `client-ts/testserver/`
-- [ ] Update `Makefile` and CI workflow
+- [x] Update `test/global-setup.ts` to point to `../testserver`
+- [x] Parse `READY:<ws>:<ctl>` to get both ports; write both to `.server-url`
+- [x] Add helper function for HTTP calls to control port
+- [x] Add kick test (server-initiated disconnect via control API)
+- [x] Add integration tests for scenarios 3, 4, 5
+- [x] Delete `client-ts/testserver/`
+- [x] Update `Makefile` and CI workflow
 
 ### Step 4 — Prepare for client-swift
 

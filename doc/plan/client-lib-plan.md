@@ -1,6 +1,6 @@
 # wspulse Client Library Plan — Multi-Language
 
-> Status: draft · Last updated: 2026-03-12
+> Status: draft · Last updated: 2026-03-18
 
 Roadmap for wspulse client libraries beyond Go. The API and behaviour requirements are fully specified in the contract docs — this file tracks **what** to build and **where things stand**.
 
@@ -38,10 +38,10 @@ Phases per library:
 | Library             | P1  | P2  | P3  | P4  | P5  | P6  |
 | ------------------- | --- | --- | --- | --- | --- | --- |
 | `client-go` (Go)    | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |
-| `client-ts` (TS/JS) | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  |
-| `client-kt`     | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  |
+| `client-ts` (TS/JS) | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |
+| `client-kt`         | ✅  | ✅  | ✅  | ✅  | ✅  | ✅  |
 | `client-swift`      | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  |
-| `client-py`     | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  |
+| `client-py`         | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  | ⬜  |
 
 ---
 
@@ -138,13 +138,13 @@ Every client lib must pass these behavioural tests (tested against `wspulse/serv
 
 ## Repo Naming Convention
 
-| Language   | Repo                    | Module / Package               |
-| ---------- | ----------------------- | ------------------------------ |
-| Go         | `wspulse/client-go`     | `github.com/wspulse/client-go` |
-| TypeScript | `wspulse/client-ts`     | `@wspulse/client`              |
-| Kotlin     | `wspulse/client-kt` | `com.wspulse:client-kt`    |
-| Swift      | `wspulse/client-swift`  | `WspulseClient` (SPM)          |
-| Python     | `wspulse/client-py` | `wspulse-client` (PyPI)        |
+| Language   | Repo                   | Module / Package               |
+| ---------- | ---------------------- | ------------------------------ |
+| Go         | `wspulse/client-go`    | `github.com/wspulse/client-go` |
+| TypeScript | `wspulse/client-ts`    | `@wspulse/client`              |
+| Kotlin     | `wspulse/client-kt`    | `com.wspulse:client-kt`        |
+| Swift      | `wspulse/client-swift` | `WspulseClient` (SPM)          |
+| Python     | `wspulse/client-py`    | `wspulse-client` (PyPI)        |
 
 ---
 

@@ -1,6 +1,6 @@
 # wspulse Kotlin Client — Development Plan (`client-kt`)
 
-> Status: **shipped v0.2.0** · Last updated: 2026-03-17
+> Status: **shipped v0.2.0** · Last updated: 2026-03-18
 > Repo: `wspulse/client-kt` · Package: `com.github.wspulse:client-kt` (JitPack)
 
 **Read before starting:**
@@ -113,27 +113,11 @@ Actual shipped dependencies (v0.2.0):
 - [x] `writeWait`: `withTimeout(writeWait)` around Ktor send ✅
 - [x] `maxMessageSize`: close with code 1009 when exceeded ✅
 
-### P5 — Test Suite ✅ (partially covers plan scenarios)
+### P5 — Test Suite ✅
 
-9 integration tests + 4 backoff unit tests + 9 codec unit tests + 15 config validation tests + resource tests:
+14 integration tests + 4 backoff unit tests + 9 codec unit tests + 15 config validation tests + resource tests.
 
-| Plan # | Scenario                                          | Status                                                          |
-| ------ | ------------------------------------------------- | --------------------------------------------------------------- |
-| 1      | Connect → send → echo → close clean               | ✅ `connects, sends a frame, receives echo, and closes cleanly` |
-| 2      | Server drops → onTransportDrop + onDisconnect     | ✅ `onDisconnect fires exactly once on close`                   |
-| 3      | Auto-reconnect: reconnects within maxRetries      | ❌ Not directly tested (reconnect integration test missing)     |
-| 4      | Max retries exhausted → RetriesExhaustedException | ❌ Not directly tested                                          |
-| 5      | `close()` during reconnect → onDisconnect(null)   | ❌ Not directly tested                                          |
-| 6      | `send()` on closed → ConnectionClosedException    | ✅ `send after close throws ConnectionClosedException`          |
-| 7      | No pong within pongWait → reconnect               | ❌ Not directly tested                                          |
-| 8      | Concurrent sends: no race                         | ✅ `concurrent sends do not race`                               |
-| —      | Round-trip all Frame fields                       | ✅ `round-trips all Frame fields (id, event, payload)`          |
-| —      | Server rejection                                  | ✅ `handles server rejection gracefully`                        |
-| —      | Room routing via query param                      | ✅ `connects to a specific room via query param`                |
-| —      | Close is idempotent                               | ✅ `close is idempotent`                                        |
-| —      | Multiple concurrent sends in order                | ✅ `sends multiple frames and receives them in order`           |
-
-> Scenarios 3, 4, 5, 7 (reconnect/heartbeat edge-cases) have no integration test. This is the primary gap vs the plan.
+> **Canonical integration test coverage matrix:** [`client-kt/doc/integration-tests.md`](../../../client-kt/doc/integration-tests.md)
 
 ### P6 — Publish ✅ (via JitPack, not Maven Central)
 
@@ -144,19 +128,16 @@ Actual shipped dependencies (v0.2.0):
 - [x] ~~Maven Central publish~~ — N/A (JitPack used instead)
 - [x] ~~GPG signing~~ — N/A (JitPack does not require signing)
 
-### P7 — Integration Test Gap (scenarios 3, 4, 5) ⬜
+### P7 — Integration Test Gap ✅
 
-The current testserver (`client-kt/testserver/`) is a simple echo+reject server with no ability to trigger server-initiated disconnects. Scenarios 3 (auto-reconnect success), 4 (max retries exhausted), and 5 (close during reconnect) require the test harness to **kick connections** and **shut down / restart the server** on demand.
+Migrated to the [shared testserver](testserver-plan.md) with HTTP control API. All scenarios covered including pong timeout (scenario 7).
 
-client-go covers these scenarios because it embeds `wspulse/server` in-process via `httptest.NewServer` and calls `srv.Kick()` / `srv.Close()` directly. Non-Go clients need an external testserver with HTTP control endpoints.
+> **Canonical integration test coverage matrix:** [`client-kt/doc/integration-tests.md`](../../../client-kt/doc/integration-tests.md)
 
-**Plan:** migrate to the [shared testserver](testserver-plan.md) with an HTTP control API (`/kick`, `/shutdown`, `/restart`), then add integration tests:
-
-- [ ] Migrate to shared testserver (see [testserver-plan.md](testserver-plan.md) Step 2)
-- [ ] Scenario 3: kick → verify `onReconnect(0)` → verify message delivery resumes
-- [ ] Scenario 4: shutdown → verify `onDisconnect(RetriesExhaustedException)` fires exactly once
-- [ ] Scenario 5: kick → call `close()` before reconnect completes → verify `onDisconnect(null)`
-- [ ] Scenario 7 (pong timeout): deferred — requires testserver `?ignore_pings=1` support
+- [x] Migrate to shared testserver (see [testserver-plan.md](testserver-plan.md) Step 2)
+- [x] Add kick test (server-initiated disconnect via control API)
+- [x] Delete `client-kt/testserver/` after migration
+- [x] Scenarios 3, 4, 5, 7 — all done
 
 ---
 

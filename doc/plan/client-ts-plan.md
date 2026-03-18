@@ -1,6 +1,6 @@
 # wspulse TypeScript Client — Development Plan (`client-ts`)
 
-> Status: P1–P6 complete · Last updated: 2026-03-16
+> Status: P1–P6 complete · Last updated: 2026-03-18
 > Repo: `wspulse/client-ts` · Package: `@wspulse/client-ts`
 
 **Read before starting:**
@@ -147,37 +147,24 @@ client-ts/
 
 ### P5 — Test Suite ✅
 
-44 tests passing across 6 test files. Scenarios 1–7 and 9 covered using lightweight `ws.WebSocketServer` echo servers (no live `wspulse/server` required). Scenario 8 is N/A for single-threaded JS.
+44 unit tests passing across 6 test files (lightweight `ws.WebSocketServer` mocks, no live server). Scenarios 1–7 and 9 covered; scenario 8 is N/A (single-threaded JS). 14 integration tests against a live `wspulse/server`.
 
-| #   | Scenario                                                      | Status                                         |
-| --- | ------------------------------------------------------------- | ---------------------------------------------- |
-| 1   | Connect → send → echo → close clean                           | ✅ Done                                        |
-| 2   | Server drops → onTransportDrop + onDisconnect (no reconnect)  | ✅ Done                                        |
-| 3   | Auto-reconnect: server drops → reconnects within maxRetries   | ✅ Done                                        |
-| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedError)` | ✅ Done                                        |
-| 5   | `close()` during reconnect → loop stops, `onDisconnect(null)` | ✅ Done                                        |
-| 6   | `send()` on closed client → `ConnectionClosedError`           | ✅ Done                                        |
-| 7   | Heartbeat pong timeout → transport drop                       | ✅ Done (short pongWait, server ignores pings) |
-| 8   | Concurrent sends: no race / interleaving                      | N/A (single-threaded JS)                       |
-| 9   | Concurrent close + transport drop → onDisconnect exactly once | ✅ Done                                        |
+> **Canonical scenario matrix:** [`client-ts/doc/integration-tests.md`](../../../client-ts/doc/integration-tests.md)
 
-Additional tests: done resolution, close idempotency, head-drop on buffer overflow, connect failure to unreachable host, message ordering, maxMessageSize enforcement.
+- [x] P5 stretch: integration tests against a live `wspulse/server` instance (vitest globalSetup with `go run .`) — 14 tests via shared `testserver/` (migrated from per-client testserver)
 
-- [x] P5 stretch: integration tests against a live `wspulse/server` instance (vitest globalSetup with `go run .`) — 6 tests via `testserver/` Go program
+### Integration Test Gap ✅
 
-### Integration Test Gap
+Unit tests (via lightweight `ws.WebSocketServer` mocks) cover all 9 scenarios. Integration tests cover 14 scenarios against a live `wspulse/server`.
 
-Unit tests (via lightweight `ws.WebSocketServer` mocks) cover all 9 scenarios. However, the 6 **integration tests** against a live `wspulse/server` only cover basic echo/reject/ordering — they do not exercise reconnect or heartbeat paths against the real server.
+> **Canonical coverage matrix:** [`client-ts/doc/integration-tests.md`](../../../client-ts/doc/integration-tests.md)
 
-The current `client-ts/testserver/` is a simple echo+reject server with no ability to trigger server-initiated disconnects. To test scenarios 3–5 against a live server, the testserver needs kick/shutdown/restart capabilities.
+Migration checklist:
 
-**Plan:** migrate to the [shared testserver](testserver-plan.md) with an HTTP control API, then add integration tests:
-
-- [ ] Migrate to shared testserver (see [testserver-plan.md](testserver-plan.md) Step 3)
-- [ ] Integration scenario 3: kick → verify reconnect → verify echo resumes
-- [ ] Integration scenario 4: shutdown → verify `onDisconnect(RetriesExhaustedError)`
-- [ ] Integration scenario 5: kick → call `close()` during reconnect → verify `onDisconnect(null)`
-- [ ] Delete `client-ts/testserver/` after migration
+- [x] Migrate to shared testserver (see [testserver-plan.md](testserver-plan.md) Step 3)
+- [x] Add kick test (server-initiated disconnect via control API)
+- [x] Delete `client-ts/testserver/` after migration
+- [x] Integration scenarios 3, 4, 5, 7 — all done
 
 ---
 
