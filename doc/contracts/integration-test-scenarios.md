@@ -26,12 +26,12 @@ All client libraries test against the same Go binary located at [`testserver/`](
 
 ### WebSocket Query Parameters
 
-| Param           | Effect                                                              |
-| --------------- | ------------------------------------------------------------------- |
-| `?reject=1`     | Server returns HTTP 403 on upgrade (simulates auth failure)         |
-| `?room=<id>`    | Join a specific room                                                |
-| `?id=<id>`      | Register a session ID (required for `/kick`)                        |
-| `?ignore_pings=1` | Server suppresses Pong replies (for heartbeat timeout testing)   |
+| Param             | Effect                                                         |
+| ----------------- | -------------------------------------------------------------- |
+| `?reject=1`       | Server returns HTTP 403 on upgrade (simulates auth failure)    |
+| `?room=<id>`      | Join a specific room                                           |
+| `?id=<id>`        | Register a session ID (required for `/kick`)                   |
+| `?ignore_pings=1` | Server suppresses Pong replies (for heartbeat timeout testing) |
 
 ---
 
@@ -39,17 +39,17 @@ All client libraries test against the same Go binary located at [`testserver/`](
 
 Every client must implement tests for the following 9 scenarios. Error type names are conceptual — use the language-appropriate mapping from `client-interface.md`.
 
-| #   | Scenario                                                          | Behaviour Reference                | Query Params       | Notes                                   |
-| --- | ----------------------------------------------------------------- | ---------------------------------- | ------------------ | --------------------------------------- |
-| 1   | Connect → send → echo → close clean                              | Lifecycle: INIT → CONNECTED → CLOSED | —                  | Basic happy-path                        |
-| 2   | Server drops → `onTransportDrop` + `onDisconnect` (no reconnect) | `onTransportDrop`, `onDisconnect`  | —                  | autoReconnect disabled                  |
-| 3   | Auto-reconnect: server drops → reconnects within maxRetries      | Auto-Reconnect steps 1–5          | `?id=…`            | Use `/kick` to trigger drop             |
-| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedError)`    | Auto-Reconnect step 7             | `?id=…`            | Use `/shutdown` to make all dials fail  |
-| 5   | `close()` during reconnect → loop stops, `onDisconnect(nil)`     | `close()` Semantics                | `?id=…`            | Call `close()` from `onReconnect`       |
-| 6   | `send()` on closed client → `ConnectionClosedError`              | `send()` Semantics                 | —                  |                                         |
-| 7   | Heartbeat pong timeout → `ConnectionLostError`                   | Heartbeat: client-side             | `?ignore_pings=1`  | Short `pingPeriod`/`pongWait` for speed |
-| 8   | Concurrent sends: no data race or interleaving                   | `send()` Semantics: ordering       | —                  | See [Threading note](#threading-note)   |
-| 9   | Concurrent `close()` + transport drop → `onDisconnect` exactly once | `close()` Semantics: idempotent | —                  |                                         |
+| #   | Scenario                                                            | Behaviour Reference                  | Query Params      | Notes                                   |
+| --- | ------------------------------------------------------------------- | ------------------------------------ | ----------------- | --------------------------------------- |
+| 1   | Connect → send → echo → close clean                                 | Lifecycle: INIT → CONNECTED → CLOSED | —                 | Basic happy-path                        |
+| 2   | Server drops → `onTransportDrop` + `onDisconnect` (no reconnect)    | `onTransportDrop`, `onDisconnect`    | —                 | autoReconnect disabled                  |
+| 3   | Auto-reconnect: server drops → reconnects within maxRetries         | Auto-Reconnect steps 1–5             | `?id=…`           | Use `/kick` to trigger drop             |
+| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedError)`       | Auto-Reconnect step 7                | `?id=…`           | Use `/shutdown` to make all dials fail  |
+| 5   | `close()` during reconnect → loop stops, `onDisconnect(nil)`        | `close()` Semantics                  | `?id=…`           | Call `close()` from `onReconnect`       |
+| 6   | `send()` on closed client → `ConnectionClosedError`                 | `send()` Semantics                   | —                 |                                         |
+| 7   | Heartbeat pong timeout → `ConnectionLostError`                      | Heartbeat: client-side               | `?ignore_pings=1` | Short `pingPeriod`/`pongWait` for speed |
+| 8   | Concurrent sends: no data race or interleaving                      | `send()` Semantics: ordering         | —                 | See [Threading note](#threading-note)   |
+| 9   | Concurrent `close()` + transport drop → `onDisconnect` exactly once | `close()` Semantics: idempotent      | —                 |                                         |
 
 ### Threading Note
 
@@ -66,22 +66,22 @@ The concurrent-send behaviour **must** be tested in every client; only the place
 
 Beyond the scenario matrix, every client must include these tests:
 
-| Test                                  | What It Covers                             | Query Params |
-| ------------------------------------- | ------------------------------------------ | ------------ |
-| Frame field round-trip                | All `Frame` fields (`id`, `event`, `payload`) survive encode → wire → decode | — |
-| Server rejection handling             | Server returns HTTP error on upgrade       | `?reject=1`  |
-| Message ordering                      | Send N frames, receive them in the same order | —         |
-| Room routing                          | Connect with `?room=<id>`, verify isolation | `?room=…`   |
-| Server-initiated kick                 | `POST /kick?id=…` → `onDisconnect(error)` | `?id=…`      |
+| Test                      | What It Covers                                                               | Query Params |
+| ------------------------- | ---------------------------------------------------------------------------- | ------------ |
+| Frame field round-trip    | All `Frame` fields (`id`, `event`, `payload`) survive encode → wire → decode | —            |
+| Server rejection handling | Server returns HTTP error on upgrade                                         | `?reject=1`  |
+| Message ordering          | Send N frames, receive them in the same order                                | —            |
+| Room routing              | Connect with `?room=<id>`, verify isolation                                  | `?room=…`    |
+| Server-initiated kick     | `POST /kick?id=…` → `onDisconnect(error)`                                    | `?id=…`      |
 
 ---
 
 ## Minimum Test Count
 
-| Runtime model    | Scenario matrix | Additional tests | Total |
-| ---------------- | --------------- | ---------------- | ----- |
-| Multi-threaded   | 9               | 5                | 14    |
-| Single-threaded  | 8 (sc.8 = N/A)  | 6 (+concurrent)  | 14    |
+| Runtime model   | Scenario matrix | Additional tests | Total |
+| --------------- | --------------- | ---------------- | ----- |
+| Multi-threaded  | 9               | 5                | 14    |
+| Single-threaded | 8 (sc.8 = N/A)  | 6 (+concurrent)  | 14    |
 
 All clients must reach a minimum of **14 integration tests**.
 
