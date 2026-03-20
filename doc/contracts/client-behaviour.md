@@ -12,7 +12,8 @@ This document defines the **behavioural requirements** that every wspulse client
 ```mermaid
 stateDiagram-v2
     [*] --> INIT
-    INIT --> CONNECTED : connect()
+    INIT --> CONNECTED : connect() succeeds
+    INIT --> [*] : connect() fails <br> (error returned, no Client created)
     CONNECTED --> RECONNECTING : transport drop <br> (autoReconnect on)
     CONNECTED --> CLOSED : close()
     CONNECTED --> CLOSED : transport drop <br> (autoReconnect off)
@@ -23,6 +24,9 @@ stateDiagram-v2
 ```
 
 States are conceptual; implementations need not expose them as an enum.
+
+Note: `INIT → [*]` (connect failure) is a terminal path — the client object is
+never created, no callbacks fire, and `autoReconnect` has no effect.
 
 ---
 
@@ -58,7 +62,23 @@ States are conceptual; implementations need not expose them as an enum.
 
 ---
 
+## Initial Connection Failure
+
+The initial `connect()` / `Dial()` call must succeed before any lifecycle begins.
+If the initial dial fails, `connect()` returns/throws an error **regardless of
+whether `autoReconnect` is enabled**. No callbacks fire (`onTransportDrop`,
+`onReconnect`, `onDisconnect` are never called), and no `Client` object is
+returned.
+
+Auto-reconnect only activates after a successful initial connection — it handles
+transient network failures during an established session, not configuration
+errors at startup.
+
+---
+
 ## Auto-Reconnect Behaviour
+
+**Precondition:** the client has previously reached `CONNECTED` at least once.
 
 When `autoReconnect` is enabled:
 
@@ -66,7 +86,7 @@ When `autoReconnect` is enabled:
 2. Wait `delay = min(baseDelay × 2^attempt, maxDelay) × jitter(0.5..1.0)` (equal jitter).
 3. Fire `onReconnect(attempt)`.
 4. Attempt to dial.
-5. If successful → go to `CONNECTED`; pendng send-queue is preserved.
+5. If successful → go to `CONNECTED`; pending send-queue is preserved.
 6. If failed → increment `attempt`; if `attempt >= maxRetries > 0` → go to step 7; else go to step 2.
 7. Fire `onDisconnect(RetriesExhaustedError)` → `CLOSED`.
 

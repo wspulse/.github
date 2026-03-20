@@ -54,7 +54,8 @@ connect(url, options) → Client
 
 - `url`: WebSocket URL string (e.g. `wss://host/ws?token=…`)
 - `options`: language-specific options object / builder / named parameters
-- Returns a connected Client, or throws/returns an error if the initial connection fails and auto-reconnect is disabled.
+- Returns a connected Client, or throws/returns an error if the initial connection fails.
+- **Initial dial failure is always fatal** — even when `autoReconnect` is enabled. Auto-reconnect only activates after a successful initial connection. Initial failures typically indicate configuration errors (wrong URL, auth failure, server unreachable) that retries cannot fix. The caller must handle the error explicitly (e.g. retry with corrected config, surface to the user, or abort).
 
 ---
 
