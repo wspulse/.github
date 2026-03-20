@@ -41,8 +41,11 @@ client-swift/
       ConnectionActor.swift     # internal actor wrapping URLSessionWebSocketTask
   Tests/
     WspulseClientTests/
-      BackoffTests.swift        # unit tests — backoff formula
-      ClientTests.swift         # integration tests against wspulse/server
+      BackoffTests.swift                  # unit tests — backoff formula
+      FrameTests.swift                    # unit tests — Frame + AnyJSON
+      CodecTests.swift                    # unit tests — JSONCodec
+      ClientIntegrationTests.swift        # integration tests against wspulse/server
+      ClientIntegrationTestsSupport.swift # test helpers + server lifecycle
   Package.swift
   .github/
     workflows/
