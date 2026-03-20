@@ -1,0 +1,42 @@
+name: On PR Opened (reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  setup:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            // Assign PR author
+            await github.rest.issues.addAssignees({
+              owner, repo, issue_number,
+              assignees: [context.payload.pull_request.user.login],
+            });
+
+            // Label by branch prefix
+            const branch = context.payload.pull_request.head.ref;
+            const prefixToLabel = {
+              'feature/':  'feat',
+              'bugfix/':   'fix',
+              'fix/':      'fix',
+              'refactor/': 'refactor',
+            };
+            for (const [prefix, label] of Object.entries(prefixToLabel)) {
+              if (branch.startsWith(prefix)) {
+                await github.rest.issues.addLabels({
+                  owner, repo, issue_number,
+                  labels: [label],
+                });
+                break;
+              }
+            }
