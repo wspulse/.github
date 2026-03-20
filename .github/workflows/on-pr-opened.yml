@@ -30,6 +30,7 @@ jobs:
               'bugfix/':   'fix',
               'fix/':      'fix',
               'refactor/': 'refactor',
+              'chore/':    'chore',
             };
             for (const [prefix, label] of Object.entries(prefixToLabel)) {
               if (branch.startsWith(prefix)) {
