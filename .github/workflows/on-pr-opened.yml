@@ -26,8 +26,8 @@ jobs:
             // Label by branch prefix
             const branch = context.payload.pull_request.head.ref;
             const prefixToLabel = {
-              'feat/':     'feat',
-              'feature/':  'feat',
+              'feat/':     'feature',
+              'feature/':  'feature',
               'bugfix/':   'fix',
               'fix/':      'fix',
               'refactor/': 'refactor',
