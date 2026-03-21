@@ -157,6 +157,28 @@ Both `pingPeriod` and `pongWait` are fully configurable on each side. Developers
 
 ---
 
+## Logging
+
+Every client must log internal diagnostics using the ecosystem's standard logger:
+
+| Language   | Logger                  |
+| ---------- | ----------------------- |
+| Go         | `go.uber.org/zap`       |
+| Kotlin/JVM | SLF4J                   |
+| TypeScript | `console`               |
+| Swift      | `os.Logger`             |
+
+Rules:
+
+1. **Enabled by default** — the logger must produce output without any user configuration. Users may replace or disable it via options.
+2. **Minimum log points** — the following events must be logged:
+   - `warn`: decode failure (frame dropped), write failure, pong timeout, retries exhausted.
+   - `info`: connected, reconnected, closing, transport dropped.
+   - `debug`: reconnect attempt with delay.
+3. **Message prefix** — all log messages must start with `wspulse/client:`.
+
+---
+
 ## Shared Test Scenarios
 
 Every client lib must pass these behavioural tests against a live `wspulse/server`:
