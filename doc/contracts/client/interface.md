@@ -69,12 +69,48 @@ Every implementation must support these options:
 | `onDisconnect`    | `(error\|null) → void`              | no-op       | Called on permanent disconnect. `null`/`nil` = clean close. See behaviour doc for full semantics.                                                                                                              |
 | `onReconnect`     | `(attempt: int) → void`             | no-op       | Called at each reconnect attempt. `attempt` is 0-based.                                                                                                                                                        |
 | `onTransportDrop` | `(error) → void`                    | no-op       | Called each time the underlying transport drops (before any reconnect).                                                                                                                                        |
-| `autoReconnect`   | `(maxRetries, baseDelay, maxDelay)` | disabled    | Enable exponential backoff reconnect. `maxRetries ≤ 0` = unlimited.                                                                                                                                            |
+| `autoReconnect`   | `(maxRetries, baseDelay, maxDelay)` | disabled    | Enable exponential backoff reconnect. `maxRetries = 0` means unlimited.                                                                                                                                        |
 | `heartbeat`       | `(pingPeriod, pongWait)`            | 20 s / 60 s | Client-side Ping/Pong interval. The client sends Ping every `pingPeriod` and closes the socket if no Pong arrives within `pongWait`. Browser clients: no-op (browser handles Ping/Pong at the protocol level). |
 | `writeWait`       | duration                            | 10 s        | Deadline for a single write operation.                                                                                                                                                                         |
 | `maxMessageSize`  | bytes (int)                         | 1 MiB       | Max inbound message size. Connection closed if exceeded.                                                                                                                                                       |
 | `dialHeaders`     | map\<string, string\>               | none        | Extra HTTP headers sent during WebSocket upgrade.                                                                                                                                                              |
 | `codec`           | Codec                               | JSONCodec   | Wire-format codec for encoding/decoding Frames. Custom codecs enable binary protocols.                                                                                                                         |
+
+---
+
+## Config Validation
+
+Every implementation must validate option values at construction time and reject invalid config immediately (panic, throw, precondition failure — per language convention). Invalid configuration is a programmer error, not a runtime condition.
+
+All validation error messages must use the prefix `wspulse:` followed by a space, then the fully-qualified field name.
+
+### Validation Rules
+
+| #   | Field                      | Condition                    | Error message                                                                 |
+| --- | -------------------------- | ---------------------------- | ----------------------------------------------------------------------------- |
+| 1   | `maxMessageSize`           | `>= 0`                       | `wspulse: maxMessageSize must be non-negative`                                |
+| 2   | `maxMessageSize`           | `<= 64 MiB`                  | `wspulse: maxMessageSize exceeds maximum (64 MiB)`                            |
+| 3   | `writeWait`                | `> 0`                        | `wspulse: writeWait must be positive`                                         |
+| 4   | `writeWait`                | `<= 30 s`                    | `wspulse: writeWait exceeds maximum (30s)`                                    |
+| 5   | `heartbeat.pingPeriod`     | `> 0`                        | `wspulse: heartbeat.pingPeriod must be positive`                              |
+| 6   | `heartbeat.pingPeriod`     | `<= 1 m`                     | `wspulse: heartbeat.pingPeriod exceeds maximum (1m)`                          |
+| 7   | `heartbeat.pongWait`       | `> 0`                        | `wspulse: heartbeat.pongWait must be positive`                                |
+| 8   | `heartbeat.pongWait`       | `<= 2 m`                     | `wspulse: heartbeat.pongWait exceeds maximum (2m)`                            |
+| 9   | `heartbeat.pingPeriod`     | `< heartbeat.pongWait`       | `wspulse: heartbeat.pingPeriod must be strictly less than heartbeat.pongWait` |
+| 10  | `autoReconnect.maxRetries` | `>= 0`                       | `wspulse: autoReconnect.maxRetries must be non-negative`                      |
+| 11  | `autoReconnect.baseDelay`  | `> 0`                        | `wspulse: autoReconnect.baseDelay must be positive`                           |
+| 12  | `autoReconnect.baseDelay`  | `<= 1 m`                     | `wspulse: autoReconnect.baseDelay exceeds maximum (1m)`                       |
+| 13  | `autoReconnect.maxDelay`   | `>= autoReconnect.baseDelay` | `wspulse: autoReconnect.maxDelay must be >= autoReconnect.baseDelay`          |
+| 14  | `autoReconnect.maxDelay`   | `<= 5 m`                     | `wspulse: autoReconnect.maxDelay exceeds maximum (5m)`                        |
+| 15  | `autoReconnect.maxRetries` | `<= 32` (when `> 0`)         | `wspulse: autoReconnect.maxRetries exceeds maximum (32)`                      |
+
+Notes:
+
+- `maxMessageSize = 0` means disabled (no size limit enforced).
+- `autoReconnect.maxRetries = 0` means unlimited retries.
+- Upper bounds are intentionally conservative for a v0 library. They can be relaxed in future versions without breaking existing callers.
+- Boundary values (e.g. `maxRetries = 32`, `writeWait = 30s`) are valid and must be accepted.
+- Language-specific validation (e.g. Go's `WithCodec(nil)` → `wspulse: codec must not be nil`) may add additional checks beyond this table.
 
 ---
 
