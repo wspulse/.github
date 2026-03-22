@@ -1,13 +1,13 @@
 # wspulse Swift Client — Development Plan (`client-swift`)
 
-> Status: planned · Last updated: 2026-03-13
+> Status: v0.1.0 released · Last updated: 2026-03-22
 > Repo: `wspulse/client-swift` · Package: `WspulseClient` (SPM)
 
 **Read before starting:**
 
-- [Interface contract](../contracts/client-interface.md)
-- [Behaviour contract](../contracts/client-behaviour.md)
-- [Wire protocol](../../server/doc/protocol.md)
+- [Interface contract](../contracts/client/interface.md)
+- [Behaviour contract](../contracts/client/behaviour.md)
+- [Wire protocol](../protocol.md)
 - [client-go] reference implementation: `client-go/client.go`, `client-go/options.go`
 
 ---
@@ -32,220 +32,91 @@ Dependencies: **zero** (stdlib-only).
 client-swift/
   Sources/
     WspulseClient/
-      WspulseClient.swift       # public actor: init, connect(), send(), close(), done
-      Frame.swift               # Codable Frame struct
-      WspulseClientOptions.swift # WspulseClientOptions value type (Sendable)
-      Errors.swift              # WspulseError enum
-      Backoff.swift             # backoff(attempt:base:max:) → Duration
-      AnyJSON.swift             # Codable type-erased JSON value for payload
-      ConnectionActor.swift     # internal actor wrapping URLSessionWebSocketTask
+      WspulseClient.swift            # public actor: init, connect(), send(), close(), done
+      WspulseClient+Internal.swift   # internal loops, reconnect, helpers
+      WspulseClientOptions.swift     # WspulseClientOptions value type (Sendable)
+      ConnectionActor.swift          # internal actor wrapping URLSessionWebSocketTask
+      Frame.swift                    # Codable Frame struct
+      AnyJSON.swift                  # Codable type-erased JSON value for payload
+      Codec.swift                    # WspulseCodec protocol + JSONCodec
+      Errors.swift                   # WspulseError enum + LocalizedError
+      Backoff.swift                  # backoff(attempt:base:max:) → Duration
   Tests/
     WspulseClientTests/
       BackoffTests.swift                  # unit tests — backoff formula
       FrameTests.swift                    # unit tests — Frame + AnyJSON
       CodecTests.swift                    # unit tests — JSONCodec
+      OptionsTests.swift                  # unit tests — options validation
+      ClientUnitTests.swift               # unit tests — client state machine
+      ErrorTests.swift                    # unit tests — error descriptions
       ClientIntegrationTests.swift        # integration tests against wspulse/server
       ClientIntegrationTestsSupport.swift # test helpers + server lifecycle
   Package.swift
   .github/
     workflows/
-      ci.yml                    # swift test on macos-14 + ubuntu-latest
+      ci.yml                    # lint + unit tests (macos-15) + integration tests
+      cd.yml                    # tag-triggered release
 ```
 
 ---
 
 ## Phase Breakdown
 
-### P1 — Project Scaffold
+### P1 — Project Scaffold [DONE]
 
-- [ ] Create repo `wspulse/client-swift`
-- [ ] `Package.swift`:
-  ```swift
-  // swift-tools-version: 5.10
-  platforms: [.iOS(.v16), .macOS(.v13), .watchOS(.v9), .tvOS(.v16)]
-  targets: [
-    .target(name: "WspulseClient"),
-    .testTarget(name: "WspulseClientTests", dependencies: ["WspulseClient"]),
-  ]
-  swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
-  ```
-- [ ] CI workflow: `swift test` on `macos-14` and `ubuntu-latest` (Swift 5.10)
-- [ ] `.swiftlint.yml` for style enforcement
+- [x] Create repo `wspulse/client-swift`
+- [x] `Package.swift` with platforms, StrictConcurrency, SwiftLint integration
+- [x] CI workflow: lint + unit tests on macos-15, integration tests with Go testserver
+- [x] CD workflow: tag-triggered GitHub Release
+- [x] `.swiftlint.yml` for style enforcement
+- [x] Makefile: build, test, test-integration, lint, fmt, check, clean
 
-### P2 — Connect / Send / Close / Done
+### P2 — Connect / Send / Close / Done [DONE]
 
-- [ ] **`Frame.swift`** — `Codable`, `Sendable` struct:
+- [x] `Frame.swift` — `Codable`, `Sendable` struct with `id`, `event`, `payload`
+- [x] `AnyJSON.swift` — type-erased `Codable` JSON enum (`null`, `bool`, `number`, `string`, `array`, `object`)
+- [x] `Errors.swift` — `WspulseError` enum with `LocalizedError` conformance; cases: `connectionClosed`, `retriesExhausted`, `connectionLost`, `sendBufferFull`, `encodingFailed`
+- [x] `Codec.swift` — `WspulseCodec` protocol + `JSONCodec` default, `FrameType` enum (`.text` / `.binary`)
+- [x] `WspulseClientOptions.swift` — `Sendable` value type with callbacks, reconnect, heartbeat, codec, `os.Logger`
+- [x] `ConnectionActor.swift` — internal actor wrapping `URLSessionWebSocketTask` with `ConnectionDelegate` for lifecycle
+- [x] `WspulseClient.swift` — public actor: `connect()`, `send()`, `close()`, `done`
+- [x] `WspulseClient+Internal.swift` — read/write/ping loops, reconnect, buffer drain (split for lint compliance)
+- [x] Send buffer: `[Data]` with max 256; throws `sendBufferFull` when full
+- [x] Write loop: `AsyncStream<Void>` signal channel, replaced on each connection cycle
 
-  ```swift
-  public struct Frame: Codable, Sendable {
-      public var id: String?
-      public var event: String?
-      public var payload: AnyJSON?
-      public init(id: String? = nil, event: String? = nil, payload: AnyJSON? = nil) { ... }
-  }
-  ```
+### P3 — Auto-Reconnect + Backoff [DONE]
 
-- [ ] **`AnyJSON.swift`** — type-erased Codable value supporting `null`, `bool`, `number`, `string`, `array`, `object`:
+- [x] `backoff()` with equal jitter, negative attempt clamping, Int64 overflow protection
+- [x] Reconnect loop: `handleTransportDrop` → `startReconnectLoop` → backoff → dial + ping verify
+- [x] `close()` during reconnect: cancels reconnect task → `onDisconnect(nil)`
+- [x] `reconnectExhausted()`: `onDisconnect(.retriesExhausted)` with full cleanup
+- [x] Transport close before reconnect loop starts (early resource release)
 
-  ```swift
-  public enum AnyJSON: Codable, Sendable, Equatable {
-      case null
-      case bool(Bool)
-      case number(Double)
-      case string(String)
-      case array([AnyJSON])
-      case object([String: AnyJSON])
-  }
-  ```
+### P4 — Heartbeat + Write Deadline [DONE]
 
-  Implement `init(from:)` and `encode(to:)` by probing `KeyedDecodingContainer` types.
+- [x] Ping loop: `sendPing()` with pong timeout via `withThrowingTaskGroup`
+- [x] CancellationError handling in task groups (not misclassified as transport drop)
+- [x] `writeWait` enforced in `drainBuffer()` via task group timeout
+- [x] `maxMessageSize` enforcement on `URLSessionWebSocketTask`
+- [x] `encodingFailed` error for non-UTF8 data in text mode (not crash)
 
-- [ ] **`Errors.swift`**:
+### P5 — Test Suite [DONE]
 
-  ```swift
-  public enum WspulseError: Error, Sendable {
-      case connectionClosed
-      case retriesExhausted
-      case connectionLost
-  }
-  ```
+All 9 contract scenarios + 7 additional tests = **16 integration tests**.
+See [integration-tests.md](../../client-swift/doc/integration-tests.md) for full matrix.
 
-- [ ] **`WspulseClientOptions.swift`** — `Sendable` value type:
+**99 unit tests** covering:
+- Backoff formula, edge cases, negative attempts, overflow
+- Frame Codable round-trip, AnyJSON encoding/decoding
+- JSONCodec encode/decode
+- Options validation (preconditions, defaults)
+- Client state machine (buffer, close, send-after-close)
+- Error descriptions and LocalizedError conformance
 
-  ```swift
-  public struct WspulseClientOptions: Sendable {
-      public var onMessage: (@Sendable (Frame) -> Void)?
-      public var onDisconnect: (@Sendable (Error?) -> Void)?
-      public var onReconnect: (@Sendable (Int) -> Void)?
-      public var onTransportDrop: (@Sendable (Error) -> Void)?
-      public var autoReconnect: AutoReconnectOptions?
-      public var heartbeat: HeartbeatOptions
-      public var writeWait: Duration
-      public var maxMessageSize: Int
-      public var dialHeaders: [String: String]
-      public init() { /* set all defaults */ }
-  }
-  public struct AutoReconnectOptions: Sendable {
-      public var maxRetries: Int   // ≤ 0 = unlimited
-      public var baseDelay: Duration
-      public var maxDelay: Duration
-  }
-  public struct HeartbeatOptions: Sendable {
-      public var pingPeriod: Duration = .seconds(20)
-      public var pongWait: Duration = .seconds(60)
-  }
-  ```
-
-- [ ] **`ConnectionActor.swift`** — internal `actor` wrapping `URLSessionWebSocketTask`:
-  - Owns the `URLSessionWebSocketTask` reference
-  - `func dial(url: URL, headers: [String: String]) async throws`
-  - `func send(_ data: Data) async throws` — with timeout via `withThrowingTaskGroup`
-  - `func close(code: URLSessionWebSocketTask.CloseCode)`
-  - `func receive() async throws -> URLSessionWebSocketTask.Message`
-
-- [ ] **`WspulseClient.swift`** — public `actor`:
-
-  ```swift
-  public actor WspulseClient {
-      public let done: AsyncStream<Void>
-      private let continuation: AsyncStream<Void>.Continuation
-
-      public init(url: URL, options: WspulseClientOptions = .init()) { ... }
-      public func connect() async throws { ... }
-      public func send(_ frame: Frame) async throws { ... }
-      public func close() async { ... }
-  }
-  ```
-
-  - Internal send buffer: `[Data]` with `maxSize = 256`; oldest element dropped when full
-  - `done`: `AsyncStream<Void>` backed by a `Continuation` stored on the actor; yield once then finish on permanent disconnect
-  - `Task` for the read loop; `Task` for the write loop; both stored as `Task<Void, Never>` and cancelled in `close()`
-
-- [ ] Read loop:
-
-  ```swift
-  while !Task.isCancelled {
-      let message = try await connection.receive()
-      let frame = try decode(message)
-      options.onMessage?(frame)
-  }
-  ```
-
-- [ ] `send(_ frame:)`:
-  1. Check `_closed` flag → throw `WspulseError.connectionClosed`
-  2. Encode to `Data` via `JSONEncoder`
-  3. Append to buffer; if count > 256, remove first (`buffer.removeFirst()`)
-  4. Signal write loop (via `AsyncStream` or `AsyncChannel`)
-
-### P3 — Auto-Reconnect + Backoff
-
-- [ ] **`Backoff.swift`**:
-
-  ```swift
-  func backoff(attempt: Int, base: Duration, max: Duration) -> Duration {
-      let shift = min(attempt, 62)
-      let raw = min(base * Int(pow(2.0, Double(shift))), max)
-      let jitter = Double.random(in: 0.8...1.2)
-      return raw * jitter
-  }
-  ```
-
-  > `Duration` arithmetic: use `.components.seconds` + `nanoseconds` for precision.
-
-- [ ] Reconnect loop (detached `Task` stored on the actor):
-  1. Await `transportDropped: AsyncStream<Error>`
-  2. If `_closed` → exit
-  3. Call `options.onTransportDrop?(err)`
-  4. `try await Task.sleep(for: backoff(attempt:base:max:))`
-  5. Call `options.onReconnect?(attempt)`
-  6. Try `connection.dial(...)`:
-     - Success → reset `attempt`, restart read/write loops
-     - Fail → `attempt += 1`; if `attempt >= maxRetries > 0` → call `options.onDisconnect?(WspulseError.retriesExhausted)` → finish `done`
-  7. Go to step 1
-
-- [ ] `close()` during reconnect: `reconnectTask.cancel()` → `Task.sleep` throws `CancellationError` → caught in loop → call `options.onDisconnect?(nil)` → finish `done`
-
-### P4 — Heartbeat + Write Deadline
-
-- [ ] **Pong**: `URLSessionWebSocketTask` responds to WebSocket pings automatically — no manual pong needed.
-- [ ] **`pingPeriod` / `pongWait`**: `URLSession` does not expose ping/pong events at the `URLSessionWebSocketTask` level. Use `webSocketTask.sendPing(pongReceiveHandler:)` in a loop within the write loop:
-  ```swift
-  Task {
-      while !Task.isCancelled {
-          try await Task.sleep(for: options.heartbeat.pingPeriod)
-          try await withThrowingTaskGroup(of: Void.self) { group in
-              group.addTask { try await sendPing() }
-              group.addTask {
-                  try await Task.sleep(for: pongWait)
-                  throw WspulseError.connectionLost  // pong timeout
-              }
-              let _ = try await group.next()
-              group.cancelAll()
-          }
-      }
-  }
-  ```
-- [ ] **`writeWait`**: wrap `connection.send()` in `withThrowingTaskGroup` with a cancelling timeout task (same pattern as ping).
-- [ ] **`maxMessageSize`**: in the receive loop, check `data.count` / `string.utf8.count`; call `connection.close(code: .messageTooLong)` if exceeded.
-
-### P5 — Test Suite
-
-All 8 shared scenarios from the behaviour contract:
-
-| #   | Scenario                                                | Test approach                                                                     |
-| --- | ------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| 1   | Connect → send → echo → close clean                     | `XCTestExpectation`; start local server via `Process`; assert `onDisconnect(nil)` |
-| 2   | Server drops → onTransportDrop + onDisconnect           | Control API `POST /kick`; verify callback order with two expectations             |
-| 3   | Auto-reconnect: reconnects within maxRetries            | Control API `POST /kick`; assert `onReconnect(0)` then successful receive         |
-| 4   | Max retries exhausted → `WspulseError.retriesExhausted` | Control API `POST /shutdown`; `maxRetries = 2`                                    |
-| 5   | `close()` during reconnect → `onDisconnect(nil)`        | Control API `POST /kick`; call `close()` in `onTransportDrop`                     |
-| 6   | `send()` on closed → `WspulseError.connectionClosed`    | `XCTAssertThrowsError` after `close()`                                            |
-| 7   | No pong within pongWait → reconnect                     | Deferred — requires testserver `?ignore_pings=1` support                          |
-| 8   | Concurrent sends: no race                               | 100 concurrent `async let` calls to `send()`; verify all arrive                   |
-
-- Test infra: `setUp()` launches the [shared testserver](testserver-plan.md) via `Process` from `../testserver`; parses `READY:<ws_port>:<control_port>` from stderr; `tearDown()` terminates it
-- macOS CI only for integration tests (Linux CI for unit tests)
-- HTTP helper: `controlPost(_ path: String, params: [String: String])` calls control port endpoints
+Test infrastructure:
+- Shared Go testserver spawned via `Process` in class `setUp()`, killed in `tearDown()`
+- macOS CI only (integration tests require Go + testserver siblings)
+- `waitUntil` helper with timeout + throw on failure
 
 ---
 
@@ -255,14 +126,18 @@ All 8 shared scenarios from the behaviour contract:
 2. **`AnyJSON` payload**: avoid third-party `AnyCodable` packages — implement a minimal `AnyJSON` enum in the library to keep zero external dependencies.
 3. **`Duration` arithmetic in Swift**: `Duration` does not support `*` by `Int` directly — use `Duration.seconds(seconds) + Duration.nanoseconds(nanos)` after computing the raw value as `Double`.
 4. **Swift 6 strict concurrency**: every closure stored in `WspulseClientOptions` must be `@Sendable`. Closures that capture `XCTestExpectation` in tests must use `nonisolated(unsafe)` or `@Sendable` wrappers.
-5. **`URLSessionWebSocketTask` and Linux**: `URLSession` WebSocket is not available on Linux (no Foundation networking). The library is therefore Apple-platforms only; document this clearly. CI runs unit-only tests (backoff) on Linux, integration tests on macOS.
+5. **`URLSessionWebSocketTask` and Linux**: `URLSession` WebSocket is not available on Linux (no Foundation networking). The library is therefore Apple-platforms only; CI runs on macOS only.
+6. **Logging**: uses `os.Logger` (enabled by default). Users can replace via `WspulseClientOptions(logger:)`.
+7. **StrictConcurrency in task groups**: `addTask` closures are nonisolated — capture actor-isolated properties into locals before creating child tasks.
+8. **ConnectionDelegate lock safety**: handlers captured inside lock, invoked outside to prevent re-entrancy/deadlock.
+9. **File split**: `WspulseClient.swift` (public API) + `WspulseClient+Internal.swift` (loops, reconnect) to stay under SwiftLint `type_body_length` limit.
 
 ---
 
-## Publish Checklist (P6)
+## Publish Checklist (P6) [DONE]
 
-- [ ] README: quick-start (SPM dependency block + async/await example)
-- [ ] CHANGELOG.md with 0.1.0 entry
-- [ ] Tag `0.1.0` on `main`; Swift Package Index (swiftpackageindex.com) auto-discovers from GitHub
-- [ ] DocC documentation: `swift package generate-documentation`
-- [ ] GitHub release with SPI badge
+- [x] README: quick-start (SPM dependency block + async/await example)
+- [x] CHANGELOG.md with 0.1.0 entry
+- [x] Tag `v0.1.0` on `main`; CD creates GitHub Release automatically
+- [ ] DocC documentation: `swift package generate-documentation` (deferred)
+- [ ] Swift Package Index submission (deferred)
