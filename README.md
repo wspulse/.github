@@ -57,7 +57,3 @@ The `doc/contracts/` directory defines the interface and behaviour contracts for
 
 **Wire Protocol:**
 - [protocol.md](doc/protocol.md) — frame format, heartbeat, session resumption
-
-## License
-
-[MIT](LICENSE)
