@@ -111,19 +111,19 @@ triggers a transport drop.
 ```
 Client                           Server
   |                                |
-  |--- HTTP GET /ws (Upgrade) ---> |
-  |<-- 101 Switching Protocols --- |
+  |--- HTTP GET /ws (Upgrade) ---->|
+  |<-- 101 Switching Protocols ----|
   |                                |
   |     [frames exchanged]         |
   |                                |
-  |<-- Ping ---------------------- |  (server pingPeriod, default 10 s)
-  |-- Pong ----------------------> |  (auto-reply)
+  |<----------- Ping --------------|  (server pingPeriod, default 10 s)
+  |------------ Pong ------------->|  (auto-reply)
   |                                |
-  |-- Ping ----------------------> |  (client pingPeriod, default 20 s)
-  |<-- Pong ---------------------- |  (auto-reply)
+  |------------ Ping ------------->|  (client pingPeriod, default 20 s)
+  |<----------- Pong --------------|  (auto-reply)
   |                                |
-  |--- Close frame -------------> |  (normal close by client)
-  |<-- Close frame --------------- |
+  |--------- Close frame --------->|  (normal close by client)
+  |<-------- Close frame ----------|
   |                                |
 ```
 
