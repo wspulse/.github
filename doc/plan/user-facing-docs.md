@@ -10,12 +10,12 @@ from the existing `doc/contracts/` which targets **SDK implementers**.
 
 ## Audience Distinction
 
-| Aspect | Implementer docs (current) | User docs (new) |
-|--------|---------------------------|-----------------|
-| Location | `.github/doc/contracts/` | `.github/docs/` (TBD) |
-| Reader | SDK maintainer / contributor | App developer using the SDK |
-| Content | Exact error messages, validation rules, wire format | Concepts, recipes, recommended values |
-| Tone | Prescriptive ("must", "panic if") | Instructive ("use X when Y", "we recommend") |
+| Aspect   | Implementer docs (current)                          | User docs (new)                              |
+| -------- | --------------------------------------------------- | -------------------------------------------- |
+| Location | `.github/doc/contracts/`                            | `.github/docs/` (TBD)                        |
+| Reader   | SDK maintainer / contributor                        | App developer using the SDK                  |
+| Content  | Exact error messages, validation rules, wire format | Concepts, recipes, recommended values        |
+| Tone     | Prescriptive ("must", "panic if")                   | Instructive ("use X when Y", "we recommend") |
 
 ## Proposed Structure
 
@@ -53,6 +53,7 @@ docs/
 
 Initial content as plain Markdown in the repo. When content stabilizes, migrate to a
 doc site (MkDocs Material or Docusaurus) with:
+
 - Language tab support
 - Search
 - Versioned docs
@@ -60,7 +61,7 @@ doc site (MkDocs Material or Docusaurus) with:
 ## Prerequisite Completed
 
 - [x] Remove "Contract & Protocol" section from all SDK READMEs (user-facing
-  README should not link to implementer contracts)
+      README should not link to implementer contracts)
 
 ## Open Questions
 
