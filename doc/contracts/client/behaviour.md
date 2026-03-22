@@ -3,7 +3,7 @@
 > Version: 0 (unstable — aligned with protocol v0)
 > Applies to: all `wspulse/client-*` libraries
 
-This document defines the **behavioural requirements** that every wspulse client must implement, regardless of language. API surface (types, method names) is in [`client-interface.md`](./client-interface.md).
+This document defines the **behavioural requirements** that every wspulse client must implement, regardless of language. API surface (types, method names) is in [`interface.md`](./interface.md).
 
 ---
 

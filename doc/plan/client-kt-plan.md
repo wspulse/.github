@@ -5,9 +5,9 @@
 
 **Read before starting:**
 
-- [Interface contract](../contracts/client-interface.md)
-- [Behaviour contract](../contracts/client-behaviour.md)
-- [Wire protocol](../../server/doc/protocol.md)
+- [Interface contract](../contracts/client/interface.md)
+- [Behaviour contract](../contracts/client/behaviour.md)
+- [Wire protocol](../protocol.md)
 - [client-go] reference implementation: `client-go/client.go`, `client-go/options.go`
 
 ---

@@ -5,9 +5,9 @@
 
 This document defines the **integration test scenarios** that every wspulse client library must cover against a live `wspulse/server` instance. Per-language test names and error types vary; the behaviour being tested is fixed.
 
-For wire-level details see [`server/doc/protocol.md`](https://github.com/wspulse/server/blob/main/doc/protocol.md).
-For API surface see [`client-interface.md`](./client-interface.md).
-For behavioural requirements see [`client-behaviour.md`](./client-behaviour.md).
+For wire-level details see [`protocol.md`](https://github.com/wspulse/.github/blob/main/doc/protocol.md).
+For API surface see [`interface.md`](./interface.md).
+For behavioural requirements see [`behaviour.md`](./behaviour.md).
 
 ---
 
@@ -37,7 +37,7 @@ All client libraries test against the same Go binary located at [`testserver/`](
 
 ## Scenario Matrix
 
-Every client must implement tests for the following 9 scenarios. Error type names are conceptual — use the language-appropriate mapping from `client-interface.md`.
+Every client must implement tests for the following 9 scenarios. Error type names are conceptual — use the language-appropriate mapping from `interface.md`.
 
 | #   | Scenario                                                            | Behaviour Reference                  | Query Params      | Notes                                   |
 | --- | ------------------------------------------------------------------- | ------------------------------------ | ----------------- | --------------------------------------- |

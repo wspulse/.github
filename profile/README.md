@@ -34,7 +34,7 @@ graph LR
 | Connect from TypeScript/JS   | [client-ts README](https://github.com/wspulse/client-ts#readme)                         |
 | Connect from Kotlin/Android  | [client-kt README](https://github.com/wspulse/client-kt#readme)                         |
 | Route frames by event name   | [core/router](https://github.com/wspulse/core#router)                                   |
-| Understand the wire protocol | [server/doc/protocol.md](https://github.com/wspulse/server/blob/main/doc/protocol.md)   |
+| Understand the wire protocol | [doc/protocol.md](https://github.com/wspulse/.github/blob/main/doc/protocol.md)         |
 | Understand server internals  | [server/doc/internals.md](https://github.com/wspulse/server/blob/main/doc/internals.md) |
 | Contribute                   | [CONTRIBUTING.md](../CONTRIBUTING.md)                                                   |
 
@@ -50,7 +50,7 @@ graph LR
 
 ## Roadmap
 
-First-party client libraries are planned for Swift and Python — all implementing the same [wire protocol](https://github.com/wspulse/server/blob/main/doc/protocol.md) and [behaviour contract](doc/contracts/client-behaviour.md).
+First-party client libraries are planned for Swift and Python — all implementing the same [wire protocol](https://github.com/wspulse/.github/blob/main/doc/protocol.md) and [behaviour contract](doc/contracts/client/behaviour.md).
 
 ## Status
 

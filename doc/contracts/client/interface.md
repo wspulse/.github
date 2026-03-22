@@ -5,8 +5,8 @@
 
 This document defines the **language-agnostic API surface** that every wspulse client library must expose. Naming and syntax are adapted per language; semantics are fixed.
 
-For wire-level details see [`server/doc/protocol.md`](https://github.com/wspulse/server/blob/main/doc/protocol.md).
-For behavioural contracts (lifecycle, callbacks, reconnect semantics) see [`client-behaviour.md`](./client-behaviour.md).
+For wire-level details see [`protocol.md`](https://github.com/wspulse/.github/blob/main/doc/protocol.md).
+For behavioural contracts (lifecycle, callbacks, reconnect semantics) see [`behaviour.md`](./behaviour.md).
 
 ---
 

@@ -14,9 +14,16 @@ Organization-level shared resources for the [wspulse](https://github.com/wspulse
 profile/
   README.md               # org profile page (github.com/wspulse)
 doc/
+  protocol.md           # wire protocol specification (shared)
   contracts/
-    client-interface.md   # client API contract (all languages)
-    client-behaviour.md   # client runtime behaviour contract
+    client/
+      interface.md      # client API contract (all languages)
+      behaviour.md      # client runtime behaviour contract
+      integration-test-scenarios.md
+    server/
+      interface.md      # server API contract
+      behaviour.md      # server behavioural guarantees
+      integration-test-scenarios.md
   plan/
     client-lib-plan.md    # cross-language client plan overview
     client-ts-plan.md     # TypeScript/JS client development plan
@@ -34,12 +41,22 @@ Workflows under `.github/workflows/` are automatically inherited by all repos in
 - **auto-assign.yml** — assigns the PR author on open
 - **go-ci.yml** — reusable CI for Go modules (`fmt → lint → test -race`)
 
-## Client Contracts
+## Contracts
 
-The `doc/contracts/` directory defines the interface and behaviour contracts that all first-party client libraries must implement:
+The `doc/contracts/` directory defines the interface and behaviour contracts for both server and client:
 
-- [client-interface.md](doc/contracts/client-interface.md) — public API surface (`connect`, `send`, `close`, `done`, options, callbacks)
-- [client-behaviour.md](doc/contracts/client-behaviour.md) — runtime behaviour (reconnect, heartbeat, backpressure, shutdown sequence)
+**Client:**
+- [interface.md](doc/contracts/client/interface.md) — public API surface (`connect`, `send`, `close`, `done`, options, callbacks)
+- [behaviour.md](doc/contracts/client/behaviour.md) — runtime behaviour (reconnect, heartbeat, backpressure, shutdown sequence)
+- [integration-test-scenarios.md](doc/contracts/client/integration-test-scenarios.md) — shared test scenarios
+
+**Server:**
+- [interface.md](doc/contracts/server/interface.md) — public API surface (`Server`, `Connection`, options)
+- [behaviour.md](doc/contracts/server/behaviour.md) — behavioural guarantees (hub serialization, callbacks, session resumption)
+- [integration-test-scenarios.md](doc/contracts/server/integration-test-scenarios.md) — server test scenarios
+
+**Wire Protocol:**
+- [protocol.md](doc/protocol.md) — frame format, heartbeat, session resumption
 
 ## License
 

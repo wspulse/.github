@@ -6,9 +6,9 @@ Roadmap for wspulse client libraries beyond Go. The API and behaviour requiremen
 
 **Contracts (read before implementing):**
 
-- [Interface contract](../contracts/client-interface.md) — API surface, options, error types, language mapping
-- [Behaviour contract](../contracts/client-behaviour.md) — lifecycle, callback semantics, reconnect algo, test scenarios
-- [Wire protocol](https://github.com/wspulse/server/blob/main/doc/protocol.md) — frame format, heartbeat, session resumption
+- [Interface contract](../contracts/client/interface.md) — API surface, options, error types, language mapping
+- [Behaviour contract](../contracts/client/behaviour.md) — lifecycle, callback semantics, reconnect algo, test scenarios
+- [Wire protocol](https://github.com/wspulse/.github/blob/main/doc/protocol.md) — frame format, heartbeat, session resumption
 
 ---
 
