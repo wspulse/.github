@@ -128,7 +128,7 @@ All options are set via functional option builders. Invalid values panic at setu
 | `WithWriteWait(d)`          | `time.Duration`                  | 10 s           | (0, 30s]              |
 | `WithMaxMessageSize(n)`     | `int64`                          | 512 B          | [1, 64 MiB]           |
 | `WithSendBufferSize(n)`     | `int`                            | 256 frames     | [1, 4096]             |
-| `WithResumeWindow(d)`       | `time.Duration`                  | 0 (disabled)   | [0, 3m]               |
+| `WithResumeWindow(d)`       | `time.Duration`                  | 0 (disabled)   | [0, +∞)               |
 | `WithCodec(c)`              | `Codec`                          | `JSONCodec`    | non-nil               |
 | `WithCheckOrigin(fn)`       | `func(*http.Request) bool`       | allow all      | non-nil               |
 | `WithLogger(l)`             | `*zap.Logger`                    | `zap.NewNop()` | non-nil               |
@@ -168,10 +168,9 @@ All validation panic messages must use the prefix `wspulse:` followed by a space
 | 11  | `WithSendBufferSize` | `n`          | `>= 1`       | `wspulse: WithSendBufferSize: n must be at least 1`                                   |
 | 12  | `WithSendBufferSize` | `n`          | `<= 4096`    | `wspulse: WithSendBufferSize: n exceeds maximum (4096)`                               |
 | 13  | `WithResumeWindow`   | `d`          | `>= 0`       | `wspulse: WithResumeWindow: duration must be non-negative`                            |
-| 14  | `WithResumeWindow`   | `d`          | `<= 3 m`     | `wspulse: WithResumeWindow: duration exceeds maximum (3m)`                            |
-| 15  | `WithCodec`          | `codec`      | `!= nil`     | `wspulse: WithCodec: codec must not be nil`                                           |
-| 16  | `WithCheckOrigin`    | `fn`         | `!= nil`     | `wspulse: WithCheckOrigin: fn must not be nil`                                        |
-| 17  | `WithLogger`         | `l`          | `!= nil`     | `wspulse: WithLogger: logger must not be nil`                                         |
+| 14  | `WithCodec`          | `codec`      | `!= nil`     | `wspulse: WithCodec: codec must not be nil`                                           |
+| 15  | `WithCheckOrigin`    | `fn`         | `!= nil`     | `wspulse: WithCheckOrigin: fn must not be nil`                                        |
+| 16  | `WithLogger`         | `l`          | `!= nil`     | `wspulse: WithLogger: logger must not be nil`                                         |
 
 Notes:
 
