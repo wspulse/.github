@@ -37,19 +37,21 @@ All client libraries test against the same Go binary located at [`testserver/`](
 
 ## Scenario Matrix
 
-Every client must implement tests for the following 9 scenarios. Error type names are conceptual — use the language-appropriate mapping from `interface.md`.
+Every client must implement tests for the following 11 scenarios. Error type names are conceptual — use the language-appropriate mapping from `interface.md`.
 
 | #   | Scenario                                                            | Behaviour Reference                  | Query Params      | Notes                                   |
 | --- | ------------------------------------------------------------------- | ------------------------------------ | ----------------- | --------------------------------------- |
 | 1   | Connect → send → echo → close clean                                 | Lifecycle: INIT → CONNECTED → CLOSED | —                 | Basic happy-path                        |
 | 2   | Server drops → `onTransportDrop` + `onDisconnect` (no reconnect)    | `onTransportDrop`, `onDisconnect`    | —                 | autoReconnect disabled                  |
-| 3   | Auto-reconnect: server drops → reconnects within maxRetries         | Auto-Reconnect steps 1–5             | `?id=…`           | Use `/kick` to trigger drop             |
-| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedError)`       | Auto-Reconnect step 7                | `?id=…`           | Use `/shutdown` to make all dials fail  |
-| 5   | `close()` during reconnect → loop stops, `onDisconnect(nil)`        | `close()` Semantics                  | `?id=…`           | Call `close()` from `onReconnect`       |
+| 3   | Auto-reconnect: server drops → reconnects within maxRetries         | Auto-Reconnect steps 1–4             | `?id=…`           | Use `/kick` to trigger drop             |
+| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedError)`       | Auto-Reconnect step 6                | `?id=…`           | Use `/shutdown` to make all dials fail  |
+| 5   | `close()` during reconnect → loop stops, `onDisconnect(nil)`        | `close()` Semantics                  | `?id=…`           | Call `close()` during reconnect backoff |
 | 6   | `send()` on closed client → `ConnectionClosedError`                 | `send()` Semantics                   | —                 |                                         |
 | 7   | Heartbeat pong timeout → `ConnectionLostError`                      | Heartbeat: client-side               | `?ignore_pings=1` | Short `pingPeriod`/`pongWait` for speed |
 | 8   | Concurrent sends: no data race or interleaving                      | `send()` Semantics: ordering         | —                 | See [Threading note](#threading-note)   |
 | 9   | Concurrent `close()` + transport drop → `onDisconnect` exactly once | `close()` Semantics: idempotent      | —                 |                                         |
+| 10  | `onTransportRestore` fires after successful reconnect               | `onTransportRestore`                 | `?id=…`           | Use `/kick` then reconnect              |
+| 11  | `onTransportRestore` does not fire on initial connect               | `onTransportRestore`                 | —                 |                                         |
 
 ### Threading Note
 
@@ -80,10 +82,10 @@ Beyond the scenario matrix, every client must include these tests:
 
 | Runtime model   | Scenario matrix | Additional tests | Total |
 | --------------- | --------------- | ---------------- | ----- |
-| Multi-threaded  | 9               | 5                | 14    |
-| Single-threaded | 8 (sc.8 = N/A)  | 6 (+concurrent)  | 14    |
+| Multi-threaded  | 11              | 5                | 16    |
+| Single-threaded | 10 (sc.8 = N/A) | 6 (+concurrent)  | 16    |
 
-All clients must reach a minimum of **14 integration tests**.
+All clients must reach a minimum of **16 integration tests**.
 
 ---
 

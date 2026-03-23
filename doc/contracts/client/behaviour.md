@@ -46,11 +46,12 @@ never created, no callbacks fire, and `autoReconnect` has no effect.
 - `err` is never nil/null — always carries the transport-level error.
 - Does **not** fire when `close()` is called by the user.
 
-### `onReconnect(attempt)`
+### `onTransportRestore()`
 
-- Fires at the start of each reconnect attempt (before the dial).
-- `attempt` is 0-based: first retry = 0, second retry = 1, etc.
-- Fires regardless of whether the attempt succeeds.
+- Fires after a successful reconnect when the new transport is ready and pumps are running.
+- Fires exactly once per successful reconnect (not on each retry attempt).
+- Does **not** fire on the initial connection (only after a transport drop + successful reconnect).
+- Must fire before any `onMessage` from the new transport.
 
 ### `onDisconnect(err)`
 
@@ -67,7 +68,7 @@ never created, no callbacks fire, and `autoReconnect` has no effect.
 The initial `connect()` / `Dial()` call must succeed before any lifecycle begins.
 If the initial dial fails, `connect()` returns/throws an error **regardless of
 whether `autoReconnect` is enabled**. No callbacks fire (`onTransportDrop`,
-`onReconnect`, `onDisconnect` are never called), and no `Client` object is
+`onTransportRestore`, `onDisconnect` are never called), and no `Client` object is
 returned.
 
 Auto-reconnect only activates after a successful initial connection — it handles
@@ -84,11 +85,10 @@ When `autoReconnect` is enabled:
 
 1. On transport drop → fire `onTransportDrop(err)`.
 2. Wait `delay = min(baseDelay × 2^attempt, maxDelay) × jitter(0.5..1.0)` (equal jitter).
-3. Fire `onReconnect(attempt)`.
-4. Attempt to dial.
-5. If successful → go to `CONNECTED`; pending send-queue is preserved.
-6. If failed → increment `attempt`; if `attempt >= maxRetries > 0` → go to step 7; else go to step 2.
-7. Fire `onDisconnect(RetriesExhaustedError)` → `CLOSED`.
+3. Attempt to dial.
+4. If successful → fire `onTransportRestore()` → go to `CONNECTED`; pending send-queue is preserved.
+5. If failed → increment `attempt`; if `attempt >= maxRetries > 0` → go to step 6; else go to step 2.
+6. Fire `onDisconnect(RetriesExhaustedError)` → `CLOSED`.
 
 When `autoReconnect` is disabled:
 

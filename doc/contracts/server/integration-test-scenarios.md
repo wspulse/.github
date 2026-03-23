@@ -31,6 +31,9 @@ Server integration tests use real WebSocket connections. The test harness create
 | 8   | Kick bypasses resume window           | Kick semantics                          | `OnDisconnect` fires immediately. No suspended state.                                      |
 | 9   | Kick non-existent connection          | Kick semantics                          | Returns `ErrConnectionNotFound`.                                                            |
 | 10  | Graceful shutdown                     | Graceful shutdown                       | All clients receive close frames. `OnDisconnect` fires for every session. No goroutine leaks. |
+| 11  | OnTransportDrop fires on suspend      | Callback ordering, Resume window        | `OnTransportDrop(conn, err)` fires when transport dies and `resumeWindow > 0`. `err` is non-nil. |
+| 12  | OnTransportRestore fires on resume    | Callback ordering, Resume window        | `OnTransportRestore(conn)` fires when suspended session resumes. Same `Connection` object.    |
+| 13  | Transport callbacks skip without resume | Callback ordering                     | Neither `OnTransportDrop` nor `OnTransportRestore` fires when `resumeWindow == 0`.            |
 
 ---
 
@@ -51,6 +54,8 @@ Server integration tests use real WebSocket connections. The test harness create
 | Empty connectionID gets UUID          | When `ConnectFunc` returns empty `connectionID`, server assigns a non-empty UUID.            |
 | Concurrent Send from multiple goroutines | Multiple goroutines calling `Server.Send` concurrently — no data race, all frames delivered. |
 | OnConnect/OnDisconnect goroutine safety | Callbacks run in separate goroutines and do not block the hub event loop.                   |
+| OnTransportDrop then OnDisconnect ordering | `OnTransportDrop` fires first, then `OnDisconnect` after grace expires. No overlap.       |
+| OnTransportRestore before OnMessage     | No `OnMessage` from the new transport fires until after `OnTransportRestore` completes.     |
 
 ---
 
@@ -58,9 +63,9 @@ Server integration tests use real WebSocket connections. The test harness create
 
 | Category        | Count |
 | --------------- | ----- |
-| Scenario matrix | 10    |
-| Additional      | 13    |
-| **Total**       | **23** |
+| Scenario matrix | 13    |
+| Additional      | 15    |
+| **Total**       | **28** |
 
 ---
 

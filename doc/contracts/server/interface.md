@@ -119,9 +119,11 @@ All options are set via functional option builders. Invalid values panic at setu
 
 | Option                      | Signature / Type                 | Default        | Valid Range           |
 | --------------------------- | -------------------------------- | -------------- | --------------------- |
-| `WithOnConnect(fn)`         | `func(Connection)`               | --             | --                    |
-| `WithOnMessage(fn)`         | `func(Connection, Frame)`        | --             | --                    |
-| `WithOnDisconnect(fn)`      | `func(Connection, error)`        | --             | --                    |
+| `WithOnConnect(fn)`            | `func(Connection)`               | --             | --                    |
+| `WithOnMessage(fn)`            | `func(Connection, Frame)`        | --             | --                    |
+| `WithOnDisconnect(fn)`         | `func(Connection, error)`        | --             | --                    |
+| `WithOnTransportDrop(fn)`      | `func(Connection, error)`        | --             | --                    |
+| `WithOnTransportRestore(fn)`   | `func(Connection)`               | --             | --                    |
 | `WithHeartbeat(ping, pong)` | `(time.Duration, time.Duration)` | 10 s / 30 s    | (0, 5m] / (ping, 10m] |
 | `WithWriteWait(d)`          | `time.Duration`                  | 10 s           | (0, 30s]              |
 | `WithMaxMessageSize(n)`     | `int64`                          | 512 B          | [1, 64 MiB]           |
@@ -135,9 +137,11 @@ All options are set via functional option builders. Invalid values panic at setu
 
 | Callback       | Goroutine                           | Notes                                                                                   |
 | -------------- | ----------------------------------- | --------------------------------------------------------------------------------------- |
-| `OnConnect`    | Separate goroutine (spawned by hub) | Fires after successful registration.                                                    |
-| `OnMessage`    | Connection's `readPump` goroutine   | Must return quickly; use a goroutine for heavy work. Single-threaded per connection.    |
-| `OnDisconnect` | Separate goroutine (spawned by hub) | Fires once per session. With resume window: only after grace expires without reconnect. |
+| `OnConnect`          | Separate goroutine (spawned by hub) | Fires after successful registration.                                                    |
+| `OnMessage`          | Connection's `readPump` goroutine   | Must return quickly; use a goroutine for heavy work. Single-threaded per connection.    |
+| `OnDisconnect`       | Separate goroutine (spawned by hub) | Fires once per session. With resume window: only after grace expires without reconnect. |
+| `OnTransportDrop`    | Separate goroutine (spawned by hub) | Fires when transport dies and session enters SUSPENDED. Only when `resumeWindow > 0`.   |
+| `OnTransportRestore` | Separate goroutine (spawned by hub) | Fires when a suspended session resumes via reconnect. Only when `resumeWindow > 0`.     |
 
 ---
 
@@ -174,7 +178,7 @@ Notes:
 - Rules #2–#4 are enforced by a single combined check in `WithHeartbeat`.
 - `WithResumeWindow(0)` is valid — it disables session resumption (the default).
 - `maxMessageSize` minimum is 1 (unlike client where 0 disables the limit). The server always enforces a message size limit.
-- Callback options (`WithOnConnect`, `WithOnMessage`, `WithOnDisconnect`) accept `nil` — nil means no callback registered.
+- Callback options (`WithOnConnect`, `WithOnMessage`, `WithOnDisconnect`, `WithOnTransportDrop`, `WithOnTransportRestore`) accept `nil` — nil means no callback registered.
 - Upper bounds are intentionally conservative for a v0 library. They can be relaxed in future versions without breaking existing callers.
 - Boundary values (e.g. `sendBufferSize = 4096`, `writeWait = 30s`) are valid and must be accepted.
 

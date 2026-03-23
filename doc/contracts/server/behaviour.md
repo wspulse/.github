@@ -51,23 +51,30 @@ All session state mutations are serialized through a single-goroutine hub event 
 For a given session, callbacks fire in this order:
 
 ```
-OnConnect → OnMessage* → OnDisconnect
+OnConnect → OnMessage* → [OnTransportDrop → OnTransportRestore → OnMessage*]* → OnDisconnect
 ```
 
-| Guarantee                  | Detail                                                                                         |
-| -------------------------- | ---------------------------------------------------------------------------------------------- |
-| **OnConnect fires once**   | After successful registration. Runs in a separate goroutine.                                   |
-| **OnMessage is serial**    | Called from the connection's read goroutine. One call completes before the next begins.         |
-| **OnDisconnect fires once** | Per session lifetime, regardless of how many transport drops occur. Runs in a separate goroutine. |
-| **No overlap**             | `OnDisconnect` fires only after all `OnMessage` calls for that session have completed.         |
+| Guarantee                             | Detail                                                                                         |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **OnConnect fires once**              | After successful registration. Runs in a separate goroutine.                                   |
+| **OnMessage is serial**               | Called from the connection's read goroutine. One call completes before the next begins.         |
+| **OnDisconnect fires once**           | Per session lifetime, regardless of how many transport drops occur. Runs in a separate goroutine. |
+| **No overlap**                        | `OnDisconnect` fires only after all `OnMessage` calls for that session have completed.         |
+| **OnTransportDrop fires conditionally**    | Only when `resumeWindow > 0` and the transport dies. Runs in a separate goroutine.             |
+| **OnTransportRestore fires conditionally** | Only when a suspended session resumes via reconnect. Runs in a separate goroutine. No `OnMessage` from the new transport fires until after `OnTransportRestore`. |
 
 ### Resume window interaction
 
 When `WithResumeWindow` is configured and a transport drops:
 
+- `OnTransportDrop` fires immediately (in a separate goroutine) with the transport error.
 - `OnDisconnect` does **not** fire immediately. The session enters `SUSPENDED`.
-- If the client reconnects within the window: `OnConnect` and `OnDisconnect` are **not** re-fired. From the application layer's perspective, the connection never dropped.
+- If the client reconnects within the window: `OnTransportRestore` fires (in a separate goroutine). `OnConnect` and `OnDisconnect` are **not** re-fired.
 - If the grace timer expires: `OnDisconnect` fires with the original transport error.
+
+When `WithResumeWindow` is **not** configured (or set to 0):
+
+- Neither `OnTransportDrop` nor `OnTransportRestore` fires. `OnDisconnect` fires immediately.
 
 ---
 
