@@ -20,6 +20,8 @@ stateDiagram-v2
     RECONNECTING --> CONNECTED : dial success <br> (maxRetries not exhausted)
     RECONNECTING --> CLOSED : maxRetries exhausted
     RECONNECTING --> CLOSED : close()
+    RECONNECTING --> SESSION_EXPIRED : HTTP 410 or WS close 4100
+    SESSION_EXPIRED --> CLOSED : onSessionExpired fires
     CLOSED --> [*]
 ```
 
@@ -27,6 +29,10 @@ States are conceptual; implementations need not expose them as an enum.
 
 Note: `INIT → [*]` (connect failure) is a terminal path — the client object is
 never created, no callbacks fire, and `autoReconnect` has no effect.
+
+Note: `SESSION_EXPIRED` is a transient state — the client transitions to
+`CLOSED` immediately after `onSessionExpired` fires. The application layer
+decides whether to create a new connection.
 
 ---
 
@@ -53,12 +59,21 @@ never created, no callbacks fire, and `autoReconnect` has no effect.
 - Does **not** fire on the initial connection (only after a transport drop + successful reconnect).
 - Must fire before any `onMessage` from the new transport.
 
+### `onSessionExpired()`
+
+- Fires when a reconnect attempt receives **HTTP 410 Gone** or **WS close code 4100** (`CloseSessionExpired`) from the server.
+- Indicates the server session no longer exists: the resume window has expired or the server has restarted. Buffered messages from the previous session are lost.
+- The auto-reconnect loop **stops immediately** — the SDK does not retry.
+- Fires **before** `onDisconnect`.
+- The application layer decides the next step: establish a new connection, show UI, or exit.
+
 ### `onDisconnect(err)`
 
 - Fires **exactly once** per Client lifetime, when the client reaches `CLOSED`.
 - `err` is `nil`/`null` for a clean close (user called `close()`).
 - `err` is `RetriesExhaustedError` when max retries are exhausted.
 - `err` is `ConnectionLostError` when the server drops and auto-reconnect is off.
+- `err` is `SessionExpiredError` when the server session has expired (after `onSessionExpired` fires).
 - Must be the **last** callback to fire — no `onMessage` or `onTransportDrop` after this.
 
 ---
@@ -85,10 +100,12 @@ When `autoReconnect` is enabled:
 
 1. On transport drop → fire `onTransportDrop(err)`.
 2. Wait `delay = min(baseDelay × 2^attempt, maxDelay) × jitter(0.5..1.0)` (equal jitter).
-3. Attempt to dial.
-4. If successful → fire `onTransportRestore()` → go to `CONNECTED`; pending send-queue is preserved.
-5. If failed → increment `attempt`; if `attempt >= maxRetries > 0` → go to step 6; else go to step 2.
-6. Fire `onDisconnect(RetriesExhaustedError)` → `CLOSED`.
+3. Attempt to dial with `?resume=true` appended to the URL (reconnect only, not the initial connection).
+4. If HTTP 410 or WS close 4100 → go to step 7.
+5. If successful → fire `onTransportRestore()` → go to `CONNECTED`; pending send-queue is preserved.
+6. If failed → increment `attempt`; if `attempt >= maxRetries > 0` → go to step 8; else go to step 2.
+7. Fire `onSessionExpired()` → fire `onDisconnect(SessionExpiredError)` → `CLOSED`. Stop.
+8. Fire `onDisconnect(RetriesExhaustedError)` → `CLOSED`.
 
 When `autoReconnect` is disabled:
 
@@ -194,3 +211,5 @@ Every client lib must pass these behavioural tests against a live `wspulse/serve
 | 7   | Heartbeat: server closes after no Pong (simulated)                                    | Client reconnects (if auto-reconnect on)                       |
 | 8   | Concurrent `send()` from multiple threads/goroutines/tasks                            | No data race; all frames delivered in order per sender         |
 | 9   | `onDisconnect` + transport drop race (close() called simultaneously with server drop) | `onDisconnect` fires exactly once                              |
+| 10  | Session expired: server drops; resume window expires; client reconnects with `?resume=true` | `onSessionExpired` fires; `onDisconnect(SessionExpiredError)` fires; auto-reconnect stops |
+| 11  | Session expired: `onSessionExpired` fires, application creates a new connection | New `connect()` succeeds; new Client operates independently    |

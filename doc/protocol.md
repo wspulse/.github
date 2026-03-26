@@ -147,6 +147,70 @@ never dropped.
 
 ---
 
+## Resume Intent
+
+When a client reconnects after a transport failure, it MUST include
+`resume=true` as a query parameter in the WebSocket upgrade URL:
+
+```
+ws://host/ws?token=abc&resume=true
+```
+
+This signals to the server that the client intends to resume a previously
+suspended session. The `resume` parameter is a boolean flag; the
+`connectionID` is conveyed separately via `ConnectFunc` (application-layer
+responsibility, not part of this protocol).
+
+### Server behaviour
+
+The server evaluates the `resume` parameter in `ServeHTTP`, **before** the
+WebSocket upgrade:
+
+| Condition | Action |
+| --- | --- |
+| `resume=true`, session exists (any state) | Upgrade, resume session (existing behaviour) |
+| `resume=true`, session does not exist | **HTTP 410 Gone** — do not upgrade |
+| `resume` absent or false | Upgrade, create new session (existing behaviour) |
+
+**HTTP 410 Gone** in the wspulse context means: the client requested session
+resumption but the session no longer exists. The grace window has expired or
+the server has restarted. Buffered messages from the previous session are
+lost. The client MUST NOT automatically retry with `resume=true`.
+
+### Race condition
+
+In rare cases the HTTP pre-check may pass (session exists) but the session is
+destroyed by the grace timer before the hub processes the registration. When
+this happens, the server sends a WebSocket close frame with code **4100**
+(`CloseSessionExpired`) and does not create a new session. The client handles
+this identically to HTTP 410.
+
+### Close code 4100 — CloseSessionExpired
+
+| Code | Name | Meaning |
+| --- | --- | --- |
+| 4100 | `CloseSessionExpired` | Session resumption requested but the session no longer exists. Sent only in the upgrade-then-discover race case described above. |
+
+### Metrics
+
+The server emits `ResumeAttempt(roomID, connectionID, false)` for every
+rejected resume — whether via HTTP 410 or close code 4100.
+
+### Security
+
+The `resume` parameter is an intent signal only. Session ownership is
+verified by `ConnectFunc`, which authenticates the HTTP request and returns
+the `connectionID`. **`ConnectFunc` MUST ensure that a reconnecting client is
+the same identity that originally created the session.** Failure to do so
+allows session hijacking: an attacker who passes `ConnectFunc` with a known
+`connectionID` could resume another user's session and receive their buffered
+messages.
+
+wspulse does not enforce session ownership at the protocol layer. This is an
+application-layer responsibility, analogous to HTTP session token security.
+
+---
+
 ## Versioning
 
 This protocol document is versioned alongside the wspulse module. Breaking

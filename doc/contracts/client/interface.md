@@ -69,6 +69,7 @@ Every implementation must support these options:
 | `onDisconnect`    | `(error\|null) → void`              | no-op       | Called on permanent disconnect. `null`/`nil` = clean close. See behaviour doc for full semantics.                                                                                                              |
 | `onTransportDrop`    | `(error) → void`                    | no-op       | Called each time the underlying transport drops (before any reconnect).                                                                                                                                        |
 | `onTransportRestore` | `() → void`                         | no-op       | Called after a successful reconnect when the new transport is ready and pumps are running. Does not fire on the initial connection.                                                                             |
+| `onSessionExpired`   | `() → void`                         | no-op       | Called when a reconnect attempt discovers the server session no longer exists (HTTP 410 or WS close 4000). Auto-reconnect stops. The application layer decides whether to establish a new connection.           |
 | `autoReconnect`   | `(maxRetries, baseDelay, maxDelay)` | disabled    | Enable exponential backoff reconnect. `maxRetries = 0` means unlimited.                                                                                                                                        |
 | `heartbeat`       | `(pingPeriod, pongWait)`            | 20 s / 60 s | Client-side Ping/Pong interval. The client sends Ping every `pingPeriod` and closes the socket if no Pong arrives within `pongWait`. Browser clients: no-op (browser handles Ping/Pong at the protocol level). |
 | `writeWait`       | duration                            | 10 s        | Deadline for a single write operation.                                                                                                                                                                         |
@@ -138,6 +139,7 @@ Each language maps these sentinel concepts to its own error type. The names belo
 | `SendBufferFullError`   | `send()` called when the internal send buffer is full.                    |
 | `RetriesExhaustedError` | Passed to `onDisconnect` when max reconnect retries are exhausted.        |
 | `ConnectionLostError`   | Passed to `onDisconnect` when the server drops and auto-reconnect is off. |
+| `SessionExpiredError`   | Passed to `onDisconnect` when the server session has expired (HTTP 410 or WS close 4100). Fires after `onSessionExpired`. |
 
 ---
 
@@ -156,3 +158,4 @@ Each language maps these sentinel concepts to its own error type. The names belo
 | SendBufferFull   | `ErrSendBufferFull` (from core)        | `SendBufferFullError`              | `SendBufferFullException`                | `WspulseError.sendBufferFull`            | `SendBufferFullError`                           |
 | RetriesExhausted | `ErrRetriesExhausted`                  | `RetriesExhaustedError`            | `RetriesExhaustedException`              | `WspulseError.retriesExhausted`          | `RetriesExhaustedError`                         |
 | ConnectionLost   | `ErrConnectionLost`                    | `ConnectionLostError`              | `ConnectionLostException`                | `WspulseError.connectionLost`            | `ConnectionLostError`                           |
+| SessionExpired   | `ErrSessionExpired`                    | `SessionExpiredError`              | `SessionExpiredException`                | `WspulseError.sessionExpired`            | `SessionExpiredError`                           |
