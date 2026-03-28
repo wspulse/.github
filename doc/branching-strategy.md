@@ -7,11 +7,11 @@ Applies to all repositories in the wspulse organization.
 ## Branch Model
 
 ```
-feature/* ──→ develop ──→ main ──→ tag
-bugfix/*  ──→ develop        ↑
-refactor/*──→ develop    hotfix/* (emergency only)
-fix/*     ──→ develop
-chore/*   ──→ develop
+feature/*, feat/* ──→ develop ──→ main ──→ tag
+bugfix/*           ──→ develop        ↑
+refactor/*         ──→ develop    hotfix/* (emergency only)
+fix/*              ──→ develop
+chore/*            ──→ develop
 ```
 
 ### Branches
@@ -41,7 +41,7 @@ chore/*   ──→ develop
 3. Create a PR from `develop` to `main`. This is a **release checkpoint** — verify CI passes and scope is correct. No full re-review of code.
 4. Merge using **merge commit**.
 5. Tag on `main`: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-6. Fast-forward `develop` to `main` to keep them in sync:
+6. Merge `main` back into `develop` to keep them in sync:
    ```bash
    git checkout develop
    git merge main
@@ -57,7 +57,7 @@ For critical bugs (security vulnerabilities, data loss) when `develop` contains 
 ```
 main (vX.Y.Z) ← hotfix/description ← fix the bug
                        ↓
-               merge → main → tag vX.Y.Z+1
+               merge → main → tag vX.Y.(Z+1)
                        ↓
                merge → develop (sync the fix)
 ```
