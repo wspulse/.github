@@ -38,9 +38,14 @@ If any step fails, do not commit.
 
 ## Branching Strategy
 
+See [`doc/branching-strategy.md`](doc/branching-strategy.md) for the full branching model, release workflow, and hotfix strategy.
+
+Summary:
 - **Never push directly** to `main` or `develop`.
-- Use prefixed branches: `feature/`, `bugfix/`, `refactor/`, `fix/`.
-- All changes go through pull requests.
+- Day-to-day: feature branches merge into `develop` via PR.
+- Release: `develop` merges into `main` via PR, then tag on `main`.
+- All merges use **merge commits** (no squash, no rebase).
+- Use prefixed branches: `feat/`, `feature/`, `bugfix/`, `refactor/`, `fix/`, `chore/`, `hotfix/`.
 
 ## Commit Messages
 
