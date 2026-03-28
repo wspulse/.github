@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      TEST_COUNT: ${{ github.event_name == 'pull_request' && '5' || github.ref == 'refs/heads/main' && '3' || '1' }}
+      TEST_COUNT: ${{ (github.ref == 'refs/heads/main' || github.base_ref == 'main') && '5' || (github.ref == 'refs/heads/develop' || github.base_ref == 'develop') && '3' || '1' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
