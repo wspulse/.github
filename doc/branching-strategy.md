@@ -30,9 +30,10 @@ chore/*            ──→ develop
 ### Day-to-day workflow
 
 1. Create a branch from `develop` using the appropriate prefix.
-2. Open a PR targeting `develop`. Full code review happens here.
-3. CI must pass before merge.
-4. Merge using **merge commit** (no squash, no rebase).
+2. Add an entry to the `[Unreleased]` section of `CHANGELOG.md` describing the change. The person who writes the feature writes the CHANGELOG — do not defer to release time.
+3. Open a PR targeting `develop`. Full code review happens here.
+4. CI must pass before merge.
+5. Merge using **merge commit** (no squash, no rebase).
 
 ### Release workflow
 
