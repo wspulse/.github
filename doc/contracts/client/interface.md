@@ -109,7 +109,7 @@ All validation error messages must use the prefix `wspulse:` followed by a space
 
 Notes:
 
-- **URL scheme handling**: `http://` is auto-converted to `ws://`, `https://` to `wss://`. All other schemes (including `ws://` and `wss://`) are passed through unchanged. Invalid URLs are rejected by the underlying WebSocket library at dial time, not by wspulse.
+- **URL scheme handling**: `http://` is auto-converted to `ws://`, `https://` to `wss://`. Matching is case-insensitive per RFC 3986 (`HTTP://`, `Http://` are accepted). All other schemes (including `ws://` and `wss://`) are passed through unchanged. Invalid URLs are rejected by the underlying WebSocket library at dial time, not by wspulse.
 
 - `maxMessageSize = 0` means disabled (no size limit enforced).
 - `autoReconnect.maxRetries = 0` means unlimited retries.
