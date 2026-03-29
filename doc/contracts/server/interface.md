@@ -18,7 +18,6 @@ Re-exported from `wspulse/core`. The minimal transport unit — all fields are o
 
 | Field     | Go Type  | Description                                            |
 | --------- | -------- | ------------------------------------------------------ |
-| `ID`      | `string` | Opaque correlation ID. Omit if not needed.             |
 | `Event`   | `string` | Application-defined event name.                        |
 | `Payload` | `[]byte` | Opaque body. The server does not interpret this field. |
 

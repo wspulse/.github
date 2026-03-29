@@ -18,7 +18,6 @@ The minimal transport unit. All fields are optional at the wire layer.
 
 | Field     | Type           | Description                                            |
 | --------- | -------------- | ------------------------------------------------------ |
-| `id`      | string         | Opaque correlation ID. Omit if not needed.             |
 | `event`   | string         | Application-defined event name.                        |
 | `payload` | any JSON value | Opaque body. The client does not interpret this field. |
 
@@ -152,7 +151,7 @@ Each language maps these sentinel concepts to its own error type. The names belo
 | Send             | `client.Send(Frame) error`             | `client.send(frame): void`         | `suspend client.send(frame)`             | `await client.send(frame)`               | `await client.send(frame)`                      |
 | Close            | `client.Close() error`                 | `client.close(): void`             | `suspend client.close()`                 | `await client.close()`                   | `await client.close()`                          |
 | Done signal      | `client.Done() <-chan struct{}`        | `client.done: Promise<void>`       | `client.done: CompletableDeferred<Unit>` | `client.done: AsyncStream<Void>`         | `client.done: asyncio.Event`                    |
-| Frame type       | `core.Frame{ID, Event, Payload}`       | `{ id?, event?, payload? }`        | `data class Frame(id, event, payload)`   | `struct Frame { id, event, payload }`    | `@dataclass Frame(id, event, payload)`          |
+| Frame type       | `core.Frame{Event, Payload}`           | `{ event?, payload? }`             | `data class Frame(event, payload)`       | `struct Frame { event, payload }`        | `@dataclass Frame(event, payload)`              |
 | Codec interface  | `core.Codec` (Encode/Decode/FrameType) | `Codec` (encode/decode/binaryType) | `Codec` (encode/decode/frameType)        | `WspulseCodec` (encode/decode/frameType) | `Codec` (encode/decode/frame_type)              |
 | Default codec    | `core.JSONCodec`                       | `JSONCodec`                        | `JsonCodec`                              | `JSONCodec`                              | `JSONCodec`                                     |
 | ConnectionClosed | `ErrConnectionClosed` (from core)      | `ConnectionClosedError`            | `ConnectionClosedException`              | `WspulseError.connectionClosed`          | `ConnectionClosedError`                         |

@@ -19,7 +19,6 @@ JSON object in a WebSocket **text** frame:
 
 ```json
 {
-  "id":      "<uuid or empty>",
   "event":   "<string>",
   "payload": <any valid JSON value>
 }
@@ -27,7 +26,6 @@ JSON object in a WebSocket **text** frame:
 
 | Field     | Required | Description                                                            |
 | --------- | -------- | ---------------------------------------------------------------------- |
-| `id`      | No       | Opaque string used for ACK correlation. Omitted if empty.              |
 | `event`   | No       | Application-defined string classifying the frame purpose.              |
 | `payload` | No       | Any valid JSON value. The wspulse layer does not interpret this field. |
 
@@ -50,7 +48,6 @@ Chat message (server → client):
 
 ```json
 {
-  "id": "01JXABC",
   "event": "msg",
   "payload": { "text": "hello", "user": "alice" }
 }
@@ -60,7 +57,6 @@ System event (server → client):
 
 ```json
 {
-  "id": "01JXABD",
   "event": "sys",
   "payload": { "event": "member_join", "user_id": "bob" }
 }
@@ -69,7 +65,7 @@ System event (server → client):
 Acknowledgement (client → server):
 
 ```json
-{ "event": "ack", "payload": { "id": "01JXABC" } }
+{ "event": "ack", "payload": { "ref": "01JXABC" } }
 ```
 
 ---
