@@ -109,7 +109,7 @@ All validation error messages must use the prefix `wspulse:` followed by a space
 
 Notes:
 
-- **URL scheme handling**: `http://` is auto-converted to `ws://`, `https://` to `wss://`. Matching is case-insensitive per RFC 3986 (`HTTP://`, `Http://` are accepted). All other schemes (including `ws://` and `wss://`) are passed through unchanged. Invalid URLs are rejected by the underlying WebSocket library at dial time, not by wspulse.
+- **URL scheme handling**: `http://` is auto-converted to `ws://`, `https://` to `wss://`. Matching is case-insensitive per RFC 3986 (`HTTP://`, `Http://` are accepted). `ws://` and `wss://` are accepted as-is. Unsupported or missing schemes must be rejected immediately at setup time (panic, throw, or precondition failure per language convention) with a `wspulse:`-prefixed error message. Implementations where the underlying WebSocket library already provides a clear error for invalid schemes (Go gorilla, Node.js ws) may delegate this validation.
 
 - `maxMessageSize = 0` means disabled (no size limit enforced).
 - `autoReconnect.maxRetries = 0` means unlimited retries.
