@@ -106,12 +106,10 @@ All validation error messages must use the prefix `wspulse:` followed by a space
 | 15  | `autoReconnect.maxRetries` | `<= 32` (when `> 0`)         | `wspulse: autoReconnect.maxRetries exceeds maximum (32)`                      |
 | 16  | `sendBufferSize`           | `>= 1`                       | `wspulse: sendBufferSize must be at least 1`                                  |
 | 17  | `sendBufferSize`           | `<= 4096`                    | `wspulse: sendBufferSize exceeds maximum (4096)`                              |
-| 18  | `url` (connect/Dial)       | if scheme is present, it must be `ws`, `wss`, `http`, or `https` | `wspulse: unsupported url scheme "<scheme>", use ws://, wss://, http://, or https://` |
-| 19  | `url` (connect/Dial)       | scheme must be present        | `wspulse: url must include scheme (ws://, wss://, http://, or https://)`      |
 
 Notes:
 
-- `http://` is automatically converted to `ws://`; `https://` is automatically converted to `wss://`. This is a convenience, not an error.
+- **URL scheme handling**: `http://` is auto-converted to `ws://`, `https://` to `wss://`. All other schemes (including `ws://` and `wss://`) are passed through unchanged. Invalid URLs are rejected by the underlying WebSocket library at dial time, not by wspulse.
 
 - `maxMessageSize = 0` means disabled (no size limit enforced).
 - `autoReconnect.maxRetries = 0` means unlimited retries.
