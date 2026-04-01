@@ -49,7 +49,7 @@ Chat message (server → client):
 ```json
 {
   "event": "msg",
-  "payload": { "text": "hello", "user": "alice" }
+  "payload": { "msgId": "01JXABC", "text": "hello", "user": "alice" }
 }
 ```
 
@@ -67,6 +67,10 @@ Acknowledgement (client → server):
 ```json
 { "event": "ack", "payload": { "ref": "01JXABC" } }
 ```
+
+> **Note:** Correlation IDs such as `msgId` and `ref` above are
+> application-layer concerns carried inside `payload`. The wspulse
+> transport layer does not interpret or generate these fields.
 
 ---
 
