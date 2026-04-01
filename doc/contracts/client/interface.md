@@ -56,6 +56,27 @@ connect(url, options) → Client
 - Returns a connected Client, or throws/returns an error if the initial connection fails.
 - **Initial dial failure is always fatal** — even when `autoReconnect` is enabled. Auto-reconnect only activates after a successful initial connection. Initial failures typically indicate configuration errors (wrong URL, auth failure, server unreachable) that retries cannot fix. The caller must handle the error explicitly (e.g. retry with corrected config, surface to the user, or abort).
 
+### URL Scheme Normalization
+
+All implementations must normalize the `url` parameter before dialing:
+
+| Input scheme         | Output scheme | Behaviour            |
+| -------------------- | ------------- | -------------------- |
+| `http://` (any case) | `ws://`       | Converted            |
+| `https://` (any case)| `wss://`      | Converted            |
+| `ws://`              | `ws://`       | Passthrough          |
+| `wss://`             | `wss://`      | Passthrough          |
+| Other / missing      | —             | Implementation-defined (see below) |
+
+Scheme matching must be **case-insensitive** per RFC 3986 Section 3.1. Path, query, and fragment must be preserved verbatim.
+
+**Unsupported / missing scheme handling** is implementation-defined because platform constraints differ:
+
+- **Reject at setup time** (client-swift, client-kt): the implementation validates and throws/panics immediately. This is required when the underlying WebSocket library surfaces an uncatchable crash (Swift `URLSessionWebSocketTask` raises `NSException`) or produces unhelpful error messages (Ktor CIO).
+- **Passthrough to the underlying library** (client-go, client-ts): the implementation returns the URL unchanged and lets the underlying WebSocket dialer reject it with a catchable error. This is acceptable when the library provides clear, catchable error diagnostics (gorilla/websocket, `ws`, browser `WebSocket`).
+
+Both strategies satisfy the contract — the invalid URL is rejected before any frames are exchanged. The choice depends on the platform's error ergonomics.
+
 ---
 
 ## Options (Required)
