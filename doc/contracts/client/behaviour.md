@@ -40,11 +40,13 @@ never created, no callbacks fire, and `autoReconnect` has no effect.
 
 ### `onTransportDrop(err)`
 
-- Fires each time the underlying WebSocket connection drops unexpectedly.
+- Fires each time an active transport closes — whether due to a server drop, network failure, or user-initiated `close()`.
 - Fires **before** any reconnect attempt.
 - Fires even when auto-reconnect is enabled (once per drop, not once per retry).
-- `err` is never nil/null — always carries the transport-level error.
-- Does **not** fire when `close()` is called by the user.
+- `err` is `nil`/`null` when triggered by `close()` (user-initiated graceful shutdown).
+- `err` is non-nil for unexpected drops — carries the transport-level error.
+- Applications use `err == nil` to distinguish user-initiated closes from unexpected failures.
+- When `close()` is called while `RECONNECTING` (no active transport), `onTransportDrop` does **not** fire again — it already fired for the original drop.
 
 ### `onTransportRestore()`
 
@@ -59,7 +61,8 @@ never created, no callbacks fire, and `autoReconnect` has no effect.
 - `err` is `nil`/`null` for a clean close (user called `close()`).
 - `err` is `RetriesExhaustedError` when max retries are exhausted.
 - `err` is `ConnectionLostError` when the server drops and auto-reconnect is off.
-- Must be the **last** callback to fire — no `onMessage` or `onTransportDrop` after this.
+- Must be the **last** callback to fire — no `onMessage` after this.
+- When triggered by `close()` while `CONNECTED`, `onTransportDrop(nil)` fires immediately before `onDisconnect(nil)`.
 
 ---
 
@@ -101,8 +104,8 @@ When `autoReconnect` is disabled:
 
 - May be called from any goroutine/thread/coroutine.
 - Idempotent: calling `close()` more than once is safe and has no effect after the first call.
-- If called while `CONNECTED`: cancel any pending write, close the WebSocket, fire `onDisconnect(nil)`.
-- If called while `RECONNECTING`: stop the reconnect loop immediately, fire `onDisconnect(nil)`.
+- If called while `CONNECTED`: cancel any pending write, close the WebSocket, fire `onTransportDrop(nil)` → `onDisconnect(nil)`.
+- If called while `RECONNECTING`: stop the reconnect loop immediately, fire `onDisconnect(nil)`. (`onTransportDrop` already fired for the original drop — do **not** fire again.)
 - After `close()` returns (or the returned Promise/coroutine resolves), all internal goroutines/tasks must have exited.
 
 ---
@@ -185,7 +188,7 @@ Every client lib must pass these behavioural tests against a live `wspulse/serve
 
 | #   | Scenario                                                                              | Pass condition                                                 |
 | --- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| 1   | Connect, send frame, receive echo, `close()` cleanly                                  | `onDisconnect(nil)` fires; `done` resolves                     |
+| 1   | Connect, send frame, receive echo, `close()` cleanly                                  | `onTransportDrop(nil)` → `onDisconnect(nil)`; `done` resolves  |
 | 2   | Server drops connection (auto-reconnect off)                                          | `onTransportDrop` → `onDisconnect(ConnectionLostError)`        |
 | 3   | Server drops; client reconnects within maxRetries                                     | `onTransportDrop` → `onReconnect(0)` → `onMessage` works again |
 | 4   | Server drops repeatedly; max retries exhausted                                        | `onDisconnect(RetriesExhaustedError)` fires exactly once       |
@@ -193,4 +196,4 @@ Every client lib must pass these behavioural tests against a live `wspulse/serve
 | 6   | `send()` after `close()`                                                              | Raises / returns `ConnectionClosedError`                       |
 | 7   | Heartbeat: server closes after no Pong (simulated)                                    | Client reconnects (if auto-reconnect on)                       |
 | 8   | Concurrent `send()` from multiple threads/goroutines/tasks                            | No data race; all frames delivered in order per sender         |
-| 9   | `onDisconnect` + transport drop race (close() called simultaneously with server drop) | `onDisconnect` fires exactly once                              |
+| 9   | `onDisconnect` + transport drop race (close() called simultaneously with server drop) | `onTransportDrop` fires exactly once; `onDisconnect` fires exactly once |
