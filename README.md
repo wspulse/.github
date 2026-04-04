@@ -19,11 +19,11 @@ doc/
     client/
       interface.md      # client API contract (all languages)
       behaviour.md      # client runtime behaviour contract
-      integration-test-scenarios.md
+      test-scenarios.md
     server/
       interface.md      # server API contract
       behaviour.md      # server behavioural guarantees
-      integration-test-scenarios.md
+      test-scenarios.md
   plan/
     client-lib-plan.md    # cross-language client plan overview
     client-ts-plan.md     # TypeScript/JS client development plan
@@ -48,12 +48,12 @@ The `doc/contracts/` directory defines the interface and behaviour contracts for
 **Client:**
 - [interface.md](doc/contracts/client/interface.md) — public API surface (`connect`, `send`, `close`, `done`, options, callbacks)
 - [behaviour.md](doc/contracts/client/behaviour.md) — runtime behaviour (reconnect, heartbeat, backpressure, shutdown sequence)
-- [integration-test-scenarios.md](doc/contracts/client/integration-test-scenarios.md) — shared test scenarios
+- [test-scenarios.md](doc/contracts/client/test-scenarios.md) — shared test scenarios
 
 **Server:**
 - [interface.md](doc/contracts/server/interface.md) — public API surface (`Server`, `Connection`, options)
 - [behaviour.md](doc/contracts/server/behaviour.md) — behavioural guarantees (hub serialization, callbacks, session resumption)
-- [integration-test-scenarios.md](doc/contracts/server/integration-test-scenarios.md) — server test scenarios
+- [test-scenarios.md](doc/contracts/server/test-scenarios.md) — server test scenarios
 
 **Wire Protocol:**
 - [protocol.md](doc/protocol.md) — frame format, heartbeat, session resumption

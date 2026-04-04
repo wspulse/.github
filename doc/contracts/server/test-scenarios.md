@@ -1,4 +1,4 @@
-# wspulse Server Integration Test Scenarios
+# wspulse Server Test Scenarios Contract
 
 > Version: 0 (unstable — aligned with protocol v0)
 > Applies to: `wspulse/server`

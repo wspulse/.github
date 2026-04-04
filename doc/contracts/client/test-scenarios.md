@@ -1,4 +1,4 @@
-# wspulse Integration Test Scenarios Contract
+# wspulse Client Test Scenarios Contract
 
 > Version: 0 (unstable — aligned with protocol v0)
 > Applies to: all `wspulse/client-*` libraries
