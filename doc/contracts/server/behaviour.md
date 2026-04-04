@@ -54,13 +54,13 @@ For a given session, callbacks fire in this order:
 OnConnect → OnMessage* → [OnTransportDrop → OnTransportRestore → OnMessage*]* → OnDisconnect
 ```
 
-| Guarantee                             | Detail                                                                                         |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **OnConnect fires once**              | After successful registration. Runs in a separate goroutine.                                   |
-| **OnMessage is serial**               | Called from the connection's read goroutine. One call completes before the next begins.         |
-| **OnDisconnect fires once**           | Per session lifetime, regardless of how many transport drops occur. Runs in a separate goroutine. |
-| **No overlap**                        | `OnDisconnect` fires only after all `OnMessage` calls for that session have completed.         |
-| **OnTransportDrop fires conditionally**    | Only when `resumeWindow > 0` and the transport dies. Runs in a separate goroutine.             |
+| Guarantee                                  | Detail                                                                                                                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **OnConnect fires once**                   | After successful registration. Runs in a separate goroutine.                                                                                                     |
+| **OnMessage is serial**                    | Called from the connection's read goroutine. One call completes before the next begins.                                                                          |
+| **OnDisconnect fires once**                | Per session lifetime, regardless of how many transport drops occur. Runs in a separate goroutine.                                                                |
+| **No overlap**                             | `OnDisconnect` fires only after all `OnMessage` calls for that session have completed.                                                                           |
+| **OnTransportDrop fires conditionally**    | Only when `resumeWindow > 0` and the transport dies. Runs in a separate goroutine.                                                                               |
 | **OnTransportRestore fires conditionally** | Only when a suspended session resumes via reconnect. Runs in a separate goroutine. No `OnMessage` from the new transport fires until after `OnTransportRestore`. |
 
 ### Resume window interaction
@@ -70,11 +70,27 @@ When `WithResumeWindow` is configured and a transport drops:
 - `OnTransportDrop` fires immediately (in a separate goroutine) with the transport error.
 - `OnDisconnect` does **not** fire immediately. The session enters `SUSPENDED`.
 - If the client reconnects within the window: `OnTransportRestore` fires (in a separate goroutine). `OnConnect` and `OnDisconnect` are **not** re-fired.
-- If the grace timer expires: `OnDisconnect` fires with the original transport error.
+- If the grace timer expires: `OnDisconnect` fires with `nil` error — the session ended because the resume window elapsed, not because of the original transport error (which was already delivered via `OnTransportDrop`).
 
 When `WithResumeWindow` is **not** configured (or set to 0):
 
-- Neither `OnTransportDrop` nor `OnTransportRestore` fires. `OnDisconnect` fires immediately.
+- Neither `OnTransportDrop` nor `OnTransportRestore` fires. `OnDisconnect` fires immediately with the transport error.
+
+### OnDisconnect error semantics
+
+The `error` parameter passed to `OnDisconnect` represents the **cause of session termination**, not the original transport error. The following table enumerates all scenarios:
+
+| Scenario                                                 | `OnTransportDrop` error | `OnDisconnect` error       | Reason                                                           |
+| -------------------------------------------------------- | ----------------------- | -------------------------- | ---------------------------------------------------------------- |
+| No resume window — transport dies                        | _(not called)_          | transport error            | Direct passthrough; no suspend phase.                            |
+| Resume — grace timer expires                             | transport error         | `nil`                      | Session ended due to timeout, not the original transport error.  |
+| Resume — `Connection.Close()` races with transport death | _(not called)_          | transport error            | Session never entered SUSPENDED; `Close()` prevented suspend.    |
+| `Server.Kick()`                                          | _(not called)_          | `nil`                      | Application-initiated termination.                               |
+| Duplicate connectionID                                   | _(not called)_          | `ErrDuplicateConnectionID` | Old session kicked by new registration.                          |
+| `Server.Close()`                                         | _(not called)_          | `ErrServerClosed`          | Server shutting down.                                            |
+| `Connection.Close()` while SUSPENDED                     | transport error         | `nil`                      | Application-initiated; grace timer fires immediately with `nil`. |
+
+**Key invariant**: when `OnTransportDrop` fires with the transport error, `OnDisconnect` receives `nil`. When `OnTransportDrop` does not fire, `OnDisconnect` receives the transport error directly. The transport error is delivered **exactly once** across the two callbacks.
 
 ---
 
@@ -82,10 +98,10 @@ When `WithResumeWindow` is **not** configured (or set to 0):
 
 Each connection maintains a bounded send buffer (default 256 frames, configurable via `WithSendBufferSize`).
 
-| Operation          | Buffer full behaviour                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------ |
-| `Connection.Send`  | Returns `ErrSendBufferFull`. The caller decides how to handle (retry, discard, or close).  |
-| `Server.Send`      | Returns `ErrSendBufferFull`.                                                               |
+| Operation          | Buffer full behaviour                                                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Connection.Send`  | Returns `ErrSendBufferFull`. The caller decides how to handle (retry, discard, or close).                                                                                     |
+| `Server.Send`      | Returns `ErrSendBufferFull`.                                                                                                                                                  |
 | `Server.Broadcast` | **Drop-oldest**: the oldest frame in the target connection's buffer is discarded to make room. If the buffer is still full after dropping, the new frame is silently dropped. |
 
 This ensures a slow connection cannot block the hub event loop or stall broadcasts to other healthy connections.
@@ -100,10 +116,10 @@ When a session is suspended (within the resume window), frames are buffered in a
 
 The server uses RFC 6455 Ping/Pong control frames for liveness detection.
 
-| Parameter        | Default | Valid Range        | Description                                                |
-| ---------------- | ------- | ------------------ | ---------------------------------------------------------- |
-| `pingPeriod`     | 10 s    | (0, 5m]            | Server sends a Ping every `pingPeriod`.                    |
-| `pongWait`       | 30 s    | (pingPeriod, 10m]  | If no Pong arrives within `pongWait`, the connection dies.  |
+| Parameter    | Default | Valid Range       | Description                                                |
+| ------------ | ------- | ----------------- | ---------------------------------------------------------- |
+| `pingPeriod` | 10 s    | (0, 5m]           | Server sends a Ping every `pingPeriod`.                    |
+| `pongWait`   | 30 s    | (pingPeriod, 10m] | If no Pong arrives within `pongWait`, the connection dies. |
 
 - Clients auto-reply Pong at the WebSocket protocol layer (no application-level handling needed).
 - The server also auto-replies to client-initiated Pings (gorilla default `PingHandler`).
