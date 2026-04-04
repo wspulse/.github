@@ -164,12 +164,12 @@ Both `pingPeriod` and `pongWait` are fully configurable on each side. Developers
 
 Every client must log internal diagnostics using the ecosystem's standard logger:
 
-| Language   | Logger                  |
-| ---------- | ----------------------- |
-| Go         | `go.uber.org/zap`       |
-| Kotlin/JVM | SLF4J                   |
-| TypeScript | `console`               |
-| Swift      | `os.Logger`             |
+| Language   | Logger            |
+| ---------- | ----------------- |
+| Go         | `go.uber.org/zap` |
+| Kotlin/JVM | SLF4J             |
+| TypeScript | `console`         |
+| Swift      | `os.Logger`       |
 
 Rules:
 
@@ -186,14 +186,14 @@ Rules:
 
 Every client lib must pass these behavioural tests against a live `wspulse/server`:
 
-| #   | Scenario                                                                              | Pass condition                                                 |
-| --- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| 1   | Connect, send frame, receive echo, `close()` cleanly                                  | `onTransportDrop(nil)` → `onDisconnect(nil)`; `done` resolves  |
-| 2   | Server drops connection (auto-reconnect off)                                          | `onTransportDrop` → `onDisconnect(ConnectionLostError)`        |
-| 3   | Server drops; client reconnects within maxRetries                                     | `onTransportDrop` → `onReconnect(0)` → `onMessage` works again |
-| 4   | Server drops repeatedly; max retries exhausted                                        | `onDisconnect(RetriesExhaustedError)` fires exactly once       |
-| 5   | `close()` called during reconnect loop                                                | Loop stops; `onDisconnect(nil)` fires; no further callbacks    |
-| 6   | `send()` after `close()`                                                              | Raises / returns `ConnectionClosedError`                       |
-| 7   | Heartbeat: server closes after no Pong (simulated)                                    | Client reconnects (if auto-reconnect on)                       |
-| 8   | Concurrent `send()` from multiple threads/goroutines/tasks                            | No data race; all frames delivered in order per sender         |
+| #   | Scenario                                                                              | Pass condition                                                          |
+| --- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 1   | Connect, send frame, receive echo, `close()` cleanly                                  | `onTransportDrop(nil)` → `onDisconnect(nil)`; `done` resolves           |
+| 2   | Server drops connection (auto-reconnect off)                                          | `onTransportDrop` → `onDisconnect(ConnectionLostError)`                 |
+| 3   | Server drops; client reconnects within maxRetries                                     | `onTransportDrop` → `onReconnect(0)` → `onMessage` works again          |
+| 4   | Server drops repeatedly; max retries exhausted                                        | `onDisconnect(RetriesExhaustedError)` fires exactly once                |
+| 5   | `close()` called during reconnect loop                                                | Loop stops; `onDisconnect(nil)` fires; no further callbacks             |
+| 6   | `send()` after `close()`                                                              | Raises / returns `ConnectionClosedError`                                |
+| 7   | Heartbeat: server closes after no Pong (simulated)                                    | Client reconnects (if auto-reconnect on)                                |
+| 8   | Concurrent `send()` from multiple threads/goroutines/tasks                            | No data race; all frames delivered in order per sender                  |
 | 9   | `onDisconnect` + transport drop race (close() called simultaneously with server drop) | `onTransportDrop` fires exactly once; `onDisconnect` fires exactly once |
