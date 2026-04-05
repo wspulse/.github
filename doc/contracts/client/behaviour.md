@@ -7,26 +7,101 @@ This document defines the **behavioural requirements** that every wspulse client
 
 ---
 
+## State Model Overview
+
+wspulse client state is best understood as two distinct layers:
+
+| Layer          | Scope                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| **Connection** | The high-level lifecycle the user observes (INIT → CONNECTED → CLOSED). Governs callbacks. |
+| **Transport**  | The low-level WebSocket socket state (IDLE → DIALING → OPEN → CLOSED). Invisible to users. |
+
+The two layers are **not 1:1**. A single Connection lifecycle may span multiple
+Transport open/close cycles (via reconnect). Understanding which layer a
+callback belongs to prevents confusion about when callbacks fire.
+
+---
+
+## Transport Layer
+
+The transport represents a single WebSocket socket. It is an internal
+abstraction — users never interact with it directly.
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> DIALING : dial() called
+    DIALING --> OPEN : handshake succeeds
+    DIALING --> IDLE : handshake fails
+    DIALING --> CLOSED : close() called during dial
+    OPEN --> CLOSED : read/write error or close()
+    CLOSED --> IDLE : reconnect resets transport
+    CLOSED --> [*] : connection permanently closed
+```
+
+Key points:
+
+- **DIALING is a suspension point** — in async runtimes (Swift actors, Kotlin
+  coroutines), `close()` may execute concurrently while `dial()` is in-flight.
+- A transport that transitions DIALING → CLOSED (via concurrent `close()`)
+  must never start read/write loops.
+- Transport CLOSED → IDLE only happens during auto-reconnect; the
+  Connection layer orchestrates when to retry.
+
+---
+
 ## Connection Lifecycle
+
+The connection layer is what the user sees. States are conceptual;
+implementations need not expose them as an enum.
 
 ```mermaid
 stateDiagram-v2
     [*] --> INIT
-    INIT --> CONNECTED : connect() succeeds
-    INIT --> [*] : connect() fails <br> (error returned, no Client created)
+    INIT --> CONNECTED : connect() succeeds <br> (dial OK, loops started)
+    INIT --> INIT_FAILED : connect() fails <br> (dial error or close() during dial)
+    INIT_FAILED --> [*] : no callbacks fire
+
     CONNECTED --> RECONNECTING : transport drop <br> (autoReconnect on)
     CONNECTED --> CLOSED : close()
     CONNECTED --> CLOSED : transport drop <br> (autoReconnect off)
-    RECONNECTING --> CONNECTED : dial success <br> (maxRetries not exhausted)
+
+    RECONNECTING --> CONNECTED : reconnect dial succeeds
     RECONNECTING --> CLOSED : maxRetries exhausted
     RECONNECTING --> CLOSED : close()
+
     CLOSED --> [*]
 ```
 
-States are conceptual; implementations need not expose them as an enum.
+Note: `INIT_FAILED` is a terminal path — no Client/callbacks are produced.
+This includes both dial errors **and** `close()` called during an in-flight
+`connect()`. In the latter case, `connect()` throws `ConnectionClosedError`.
 
-Note: `INIT → [*]` (connect failure) is a terminal path — the client object is
-never created, no callbacks fire, and `autoReconnect` has no effect.
+---
+
+## Callback × State Transition Matrix
+
+This matrix defines exactly which callbacks fire on each state transition.
+"—" means the callback does not fire for that transition.
+
+| Transition               | Trigger                           | `onTransportDrop`      | `onTransportRestore`   | `onDisconnect`                        |
+| ------------------------ | --------------------------------- | ---------------------- | ---------------------- | ------------------------------------- |
+| INIT → CONNECTED         | `connect()` succeeds              | —                      | —                      | —                                     |
+| INIT → INIT_FAILED       | dial fails                        | —                      | —                      | —                                     |
+| INIT → INIT_FAILED       | `close()` during dial             | —                      | —                      | —                                     |
+| CONNECTED → RECONNECTING | transport error                   | `onTransportDrop(err)` | —                      | —                                     |
+| CONNECTED → CLOSED       | `close()`                         | `onTransportDrop(nil)` | —                      | `onDisconnect(nil)`                   |
+| CONNECTED → CLOSED       | transport drop, no auto-reconnect | `onTransportDrop(err)` | —                      | `onDisconnect(ConnectionLostError)`   |
+| RECONNECTING → CONNECTED | reconnect succeeds                | —                      | `onTransportRestore()` | —                                     |
+| RECONNECTING → CLOSED    | `close()`                         | —                      | —                      | `onDisconnect(nil)`                   |
+| RECONNECTING → CLOSED    | maxRetries exhausted              | —                      | —                      | `onDisconnect(RetriesExhaustedError)` |
+
+Rules that follow from the matrix:
+
+1. **INIT → INIT_FAILED fires zero callbacks.** The client was never connected; there is nothing to "disconnect" from.
+2. **CONNECTED → CLOSED via `close()` fires both** `onTransportDrop(nil)` and `onDisconnect(nil)`, in that order.
+3. **RECONNECTING → CLOSED via `close()` fires only `onDisconnect(nil)`.** `onTransportDrop` already fired for the original transport drop — it does not fire again.
+4. **`onDisconnect` fires exactly once** per client lifetime, always as the last callback.
 
 ---
 
@@ -72,7 +147,20 @@ The initial `connect()` / `Dial()` call must succeed before any lifecycle begins
 If the initial dial fails, `connect()` returns/throws an error **regardless of
 whether `autoReconnect` is enabled**. No callbacks fire (`onTransportDrop`,
 `onTransportRestore`, `onDisconnect` are never called), and no `Client` object is
-returned.
+returned (or, in two-phase SDKs like Swift, the Client exists but never reaches
+CONNECTED).
+
+This includes two sub-cases:
+
+1. **Dial error** — network unreachable, handshake rejected, TLS failure, etc.
+   `connect()` throws the underlying transport error.
+2. **`close()` during dial** — another task/goroutine calls `close()` while
+   `connect()` is awaiting the handshake. `connect()` throws
+   `ConnectionClosedError`. See "Race: `close()` during `connect()`" under
+   `close()` Semantics.
+
+In both cases: zero callbacks fire, `done` resolves, and the client is
+permanently closed.
 
 Auto-reconnect only activates after a successful initial connection — it handles
 transient network failures during an established session, not configuration
@@ -106,7 +194,30 @@ When `autoReconnect` is disabled:
 - Idempotent: calling `close()` more than once is safe and has no effect after the first call.
 - If called while `CONNECTED`: cancel any pending write, close the WebSocket, fire `onTransportDrop(nil)` → `onDisconnect(nil)`.
 - If called while `RECONNECTING`: stop the reconnect loop immediately, fire `onDisconnect(nil)`. (`onTransportDrop` already fired for the original drop — do **not** fire again.)
+- If called while `INIT` (during an in-flight `connect()`): see "Race: `close()` during `connect()`" below.
 - After `close()` returns (or the returned Promise/coroutine resolves), all internal goroutines/tasks must have exited.
+
+### Race: `close()` during `connect()`
+
+In async runtimes (Swift actors, Kotlin coroutines, JS async/await), `close()`
+may execute while `connect()` is suspended on the initial `dial()`. This is the
+INIT → INIT_FAILED path with `close()` as the trigger.
+
+Required behaviour:
+
+1. `close()` sets the closed flag and returns. **No callbacks fire** — the client
+   has never been connected (`connected` / `hasConnected` is still false).
+2. When `dial()` eventually resumes inside `connect()`:
+   - `connect()` detects the closed flag.
+   - If dial succeeded: close the transport immediately, do not start loops.
+   - `connect()` throws `ConnectionClosedError`.
+3. `done` resolves so callers awaiting permanent disconnection are unblocked.
+
+**Implementation note:** A `connected` (or `hasConnected`) flag — set only
+after the first successful dial and **never reset** — is the recommended way to
+gate callbacks. Using `started` or any flag set before dial completes is
+incorrect because `close()` would see it during the dial suspension and
+erroneously fire callbacks.
 
 ---
 
@@ -186,14 +297,15 @@ Rules:
 
 Every client lib must pass these behavioural tests against a live `wspulse/server`:
 
-| #   | Scenario                                                                              | Pass condition                                                          |
-| --- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 1   | Connect, send frame, receive echo, `close()` cleanly                                  | `onTransportDrop(nil)` → `onDisconnect(nil)`; `done` resolves           |
-| 2   | Server drops connection (auto-reconnect off)                                          | `onTransportDrop` → `onDisconnect(ConnectionLostError)`                 |
-| 3   | Server drops; client reconnects within maxRetries                                     | `onTransportDrop` → `onReconnect(0)` → `onMessage` works again          |
-| 4   | Server drops repeatedly; max retries exhausted                                        | `onDisconnect(RetriesExhaustedError)` fires exactly once                |
-| 5   | `close()` called during reconnect loop                                                | Loop stops; `onDisconnect(nil)` fires; no further callbacks             |
-| 6   | `send()` after `close()`                                                              | Raises / returns `ConnectionClosedError`                                |
-| 7   | Heartbeat: server closes after no Pong (simulated)                                    | Client reconnects (if auto-reconnect on)                                |
-| 8   | Concurrent `send()` from multiple threads/goroutines/tasks                            | No data race; all frames delivered in order per sender                  |
-| 9   | `onDisconnect` + transport drop race (close() called simultaneously with server drop) | `onTransportDrop` fires exactly once; `onDisconnect` fires exactly once |
+| #   | Scenario                                                                              | Pass condition                                                                   |
+| --- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 1   | Connect, send frame, receive echo, `close()` cleanly                                  | `onTransportDrop(nil)` → `onDisconnect(nil)`; `done` resolves                    |
+| 2   | Server drops connection (auto-reconnect off)                                          | `onTransportDrop` → `onDisconnect(ConnectionLostError)`                          |
+| 3   | Server drops; client reconnects within maxRetries                                     | `onTransportDrop` → `onReconnect(0)` → `onMessage` works again                   |
+| 4   | Server drops repeatedly; max retries exhausted                                        | `onDisconnect(RetriesExhaustedError)` fires exactly once                         |
+| 5   | `close()` called during reconnect loop                                                | Loop stops; `onDisconnect(nil)` fires; no further callbacks                      |
+| 6   | `send()` after `close()`                                                              | Raises / returns `ConnectionClosedError`                                         |
+| 7   | Heartbeat: server closes after no Pong (simulated)                                    | Client reconnects (if auto-reconnect on)                                         |
+| 8   | Concurrent `send()` from multiple threads/goroutines/tasks                            | No data race; all frames delivered in order per sender                           |
+| 9   | `onDisconnect` + transport drop race (close() called simultaneously with server drop) | `onTransportDrop` fires exactly once; `onDisconnect` fires exactly once          |
+| 10  | `close()` called during in-flight `connect()` dial                                    | Zero callbacks fire; `connect()` throws `ConnectionClosedError`; `done` resolves |
