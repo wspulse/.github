@@ -1,0 +1,63 @@
+name: Go Stress (reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Run stress tests
+        run: go test -race -count=500 -timeout 600s ./...
+
+      - name: Report failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const today = new Date().toISOString().split('T')[0];
+
+            // Search for existing open issue with race-condition label
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              labels: 'race-condition',
+              state: 'open',
+              per_page: 1,
+            });
+
+            if (issues.length > 0) {
+              // Append comment to existing issue
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issues[0].number,
+                body: `Race condition detected again on ${today}.\n\nFailed run: ${runUrl}`,
+              });
+              core.info(`Commented on existing issue #${issues[0].number}`);
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title: `Race condition detected — ${today}`,
+                body: `Weekly stress test (\`-race -count=500\`) failed.\n\nFailed run: ${runUrl}\n\nThis issue was automatically created by the stress test workflow.`,
+                labels: ['bug', 'race-condition'],
+              });
+              core.info('Created new issue');
+            }

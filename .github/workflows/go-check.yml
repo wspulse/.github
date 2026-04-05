@@ -6,9 +6,10 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
-      TEST_COUNT: ${{ (github.ref == 'refs/heads/main' || github.base_ref == 'main') && '5' || (github.ref == 'refs/heads/develop' || github.base_ref == 'develop') && '3' || '1' }}
+      TEST_COUNT: ${{ (github.ref == 'refs/heads/main' || github.base_ref == 'main') && '100' || (github.ref == 'refs/heads/develop' || github.base_ref == 'develop') && '50' || '10' }}
+      TEST_TIMEOUT: ${{ (github.ref == 'refs/heads/main' || github.base_ref == 'main') && '300s' || (github.ref == 'refs/heads/develop' || github.base_ref == 'develop') && '180s' || '120s' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -28,4 +29,4 @@ jobs:
           version: v2.11.2
 
       - name: Run tests
-        run: go test -v -race -count=${{ env.TEST_COUNT }} -timeout 120s ./...
+        run: go test -v -race -count=${{ env.TEST_COUNT }} -timeout ${{ env.TEST_TIMEOUT }} ./...
