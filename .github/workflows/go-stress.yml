@@ -1,5 +1,8 @@
 name: Go Stress (reusable)
 
+# Caller must grant `permissions: issues: write` for the Report failure
+# step to create/update issues on test failure. Without it the step 403s.
+
 on:
   workflow_call:
 
