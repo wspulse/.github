@@ -231,6 +231,37 @@ erroneously fire callbacks.
 
 ---
 
+## Write Timeout
+
+Every client enforces a per-send deadline (`writeWait`, default **10 s**). If the
+underlying socket write does not complete within that window, the write is
+considered failed and the transport must be dropped.
+
+**Required observable behaviour:**
+
+1. The active transport is closed.
+2. `onTransportDrop(err)` fires with a **non-nil error** (not `nil` — this is not
+   a user-initiated close).
+3. If `autoReconnect` is enabled, the normal reconnect sequence begins
+   (backoff → retry → `onTransportRestore` or exhaustion).
+
+Write timeout is treated identically to any other transport drop — the same
+callback sequence and reconnect logic apply, no special handling.
+
+**Implementation note (non-normative):** How the deadline is enforced is
+language- and runtime-specific. Go sets a socket-level write deadline; Swift
+races the write against a sleep task; Kotlin wraps the call in `withTimeout`.
+The contract requires only the observable outcome — a write timeout is
+indistinguishable from any other transport drop from the caller's perspective.
+
+**What a write timeout is NOT:**
+
+- It is **not** a user-initiated close — `err` must be non-nil.
+- It is **not** a clean loop shutdown. Implementations must not silently exit the
+  write loop without completing the transport-drop sequence when a timeout fires.
+
+---
+
 ## Heartbeat
 
 wspulse uses a **dual heartbeat** model: both the server and the client independently send WebSocket **Ping** control frames and monitor **Pong** replies to detect dead connections.
@@ -309,3 +340,4 @@ Every client lib must pass these behavioural tests against a live `wspulse/serve
 | 8   | Concurrent `send()` from multiple threads/goroutines/tasks                            | No data race; all frames delivered in order per sender                           |
 | 9   | `onDisconnect` + transport drop race (close() called simultaneously with server drop) | `onTransportDrop` fires exactly once; `onDisconnect` fires exactly once          |
 | 10  | `close()` called during in-flight `connect()` dial                                    | Zero callbacks fire; `connect()` throws `ConnectionClosedError`; `done` resolves |
+| 11  | Write timeout: socket write stalls beyond `writeWait`                                 | `onTransportDrop(err)` fires with non-nil error; reconnects if auto-reconnect on |
