@@ -192,7 +192,7 @@ When `autoReconnect` is disabled:
 
 - May be called from any goroutine/thread/coroutine.
 - Idempotent: calling `close()` more than once is safe and has no effect after the first call.
-- If called while `CONNECTED`: cancel any pending write, close the WebSocket, fire `onTransportDrop(nil)` → `onDisconnect(nil)`.
+- If called while `CONNECTED`: stop the write loop, close the WebSocket, fire `onTransportDrop(nil)` → `onDisconnect(nil)`. Frames accepted by `send()` but not yet written to the transport are discarded. If the caller requires confirmed delivery, it must wait for application-level acknowledgement before calling `close()`.
 - If called while `RECONNECTING`: stop the reconnect loop immediately, fire `onDisconnect(nil)`. (`onTransportDrop` already fired for the original drop — do **not** fire again.)
 - If called while `INIT` (during an in-flight `connect()`): see "Race: `close()` during `connect()`" below.
 - After `close()` returns (or the returned Promise/coroutine resolves), all internal goroutines/tasks must have exited.
@@ -223,8 +223,11 @@ erroneously fire callbacks.
 
 ## `send()` Semantics
 
+**Delivery model: at-most-once, no delivery guarantee.**
+
 - Enqueues the encoded frame into a bounded internal buffer.
 - Returns/resolves immediately (non-blocking).
+- A successful `send()` confirms the frame has been accepted into the local buffer. It does **not** guarantee the frame has been written to the transport or received by the server.
 - Raises `ConnectionClosedError` if the client is in `CLOSED` state.
 - If the buffer is full: raises `SendBufferFullError`. The caller decides how to handle backpressure (retry, discard, or close). Note: server-side broadcast uses head-drop for 1:N fanout; client-side send is 1:1 and must not silently discard frames.
 - Frames are delivered in enqueue order. No reordering.
