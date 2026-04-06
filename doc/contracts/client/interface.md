@@ -18,7 +18,6 @@ The minimal transport unit. All fields are optional at the wire layer.
 
 | Field     | Type           | Description                                            |
 | --------- | -------------- | ------------------------------------------------------ |
-| `id`      | string         | Opaque correlation ID. Omit if not needed.             |
 | `event`   | string         | Application-defined event name.                        |
 | `payload` | any JSON value | Opaque body. The client does not interpret this field. |
 
@@ -57,6 +56,10 @@ connect(url, options) → Client
 - Returns a connected Client, or throws/returns an error if the initial connection fails.
 - **Initial dial failure is always fatal** — even when `autoReconnect` is enabled. Auto-reconnect only activates after a successful initial connection. Initial failures typically indicate configuration errors (wrong URL, auth failure, server unreachable) that retries cannot fix. The caller must handle the error explicitly (e.g. retry with corrected config, surface to the user, or abort).
 
+### URL Scheme Normalization
+
+All implementations must convert `http://` to `ws://` and `https://` to `wss://` before dialing. Invalid or unsupported URL schemes must result in an error before any frames are exchanged — either by the implementation itself or by the underlying WebSocket library.
+
 ---
 
 ## Options (Required)
@@ -73,6 +76,7 @@ Every implementation must support these options:
 | `heartbeat`       | `(pingPeriod, pongWait)`            | 20 s / 60 s | Client-side Ping/Pong interval. The client sends Ping every `pingPeriod` and closes the socket if no Pong arrives within `pongWait`. Browser clients: no-op (browser handles Ping/Pong at the protocol level). |
 | `writeWait`       | duration                            | 10 s        | Deadline for a single write operation.                                                                                                                                                                         |
 | `maxMessageSize`  | bytes (int)                         | 1 MiB       | Max inbound message size. Connection closed if exceeded.                                                                                                                                                       |
+| `sendBufferSize`  | frames (int)                        | 256         | Outbound send buffer capacity (number of frames). When full, `send()` returns `SendBufferFullError`. During reconnect, buffered frames are delivered after the new transport is established.                    |
 | `dialHeaders`     | map\<string, string\>               | none        | Extra HTTP headers sent during WebSocket upgrade.                                                                                                                                                              |
 | `codec`           | Codec                               | JSONCodec   | Wire-format codec for encoding/decoding Frames. Custom codecs enable binary protocols.                                                                                                                         |
 
@@ -103,8 +107,12 @@ All validation error messages must use the prefix `wspulse:` followed by a space
 | 13  | `autoReconnect.maxDelay`   | `>= autoReconnect.baseDelay` | `wspulse: autoReconnect.maxDelay must be >= autoReconnect.baseDelay`          |
 | 14  | `autoReconnect.maxDelay`   | `<= 5 m`                     | `wspulse: autoReconnect.maxDelay exceeds maximum (5m)`                        |
 | 15  | `autoReconnect.maxRetries` | `<= 32` (when `> 0`)         | `wspulse: autoReconnect.maxRetries exceeds maximum (32)`                      |
+| 16  | `sendBufferSize`           | `>= 1`                       | `wspulse: sendBufferSize must be at least 1`                                  |
+| 17  | `sendBufferSize`           | `<= 4096`                    | `wspulse: sendBufferSize exceeds maximum (4096)`                              |
 
 Notes:
+
+- **URL scheme handling**: `http://` is auto-converted to `ws://`, `https://` to `wss://`. Matching is case-insensitive per RFC 3986 (`HTTP://`, `Http://` are accepted). `ws://` and `wss://` are accepted as-is. Unsupported or missing schemes must be rejected immediately at setup time (panic, throw, or precondition failure per language convention) with a `wspulse:`-prefixed error message. Implementations where the underlying WebSocket library already provides a clear error for invalid schemes (Go gorilla, Node.js ws) may delegate this validation.
 
 - `maxMessageSize = 0` means disabled (no size limit enforced).
 - `autoReconnect.maxRetries = 0` means unlimited retries.
@@ -149,7 +157,7 @@ Each language maps these sentinel concepts to its own error type. The names belo
 | Send             | `client.Send(Frame) error`             | `client.send(frame): void`         | `suspend client.send(frame)`             | `await client.send(frame)`               | `await client.send(frame)`                      |
 | Close            | `client.Close() error`                 | `client.close(): void`             | `suspend client.close()`                 | `await client.close()`                   | `await client.close()`                          |
 | Done signal      | `client.Done() <-chan struct{}`        | `client.done: Promise<void>`       | `client.done: CompletableDeferred<Unit>` | `client.done: AsyncStream<Void>`         | `client.done: asyncio.Event`                    |
-| Frame type       | `core.Frame{ID, Event, Payload}`       | `{ id?, event?, payload? }`        | `data class Frame(id, event, payload)`   | `struct Frame { id, event, payload }`    | `@dataclass Frame(id, event, payload)`          |
+| Frame type       | `core.Frame{Event, Payload}`           | `{ event?, payload? }`             | `data class Frame(event, payload)`       | `struct Frame { event, payload }`        | `@dataclass Frame(event, payload)`              |
 | Codec interface  | `core.Codec` (Encode/Decode/FrameType) | `Codec` (encode/decode/binaryType) | `Codec` (encode/decode/frameType)        | `WspulseCodec` (encode/decode/frameType) | `Codec` (encode/decode/frame_type)              |
 | Default codec    | `core.JSONCodec`                       | `JSONCodec`                        | `JsonCodec`                              | `JSONCodec`                              | `JSONCodec`                                     |
 | ConnectionClosed | `ErrConnectionClosed` (from core)      | `ConnectionClosedError`            | `ConnectionClosedException`              | `WspulseError.connectionClosed`          | `ConnectionClosedError`                         |

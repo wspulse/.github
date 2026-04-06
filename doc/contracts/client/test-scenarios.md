@@ -1,4 +1,4 @@
-# wspulse Integration Test Scenarios Contract
+# wspulse Client Test Scenarios Contract
 
 > Version: 0 (unstable — aligned with protocol v0)
 > Applies to: all `wspulse/client-*` libraries
@@ -70,7 +70,7 @@ Beyond the scenario matrix, every client must include these tests:
 
 | Test                      | What It Covers                                                               | Query Params |
 | ------------------------- | ---------------------------------------------------------------------------- | ------------ |
-| Frame field round-trip    | All `Frame` fields (`id`, `event`, `payload`) survive encode → wire → decode | —            |
+| Frame field round-trip    | All `Frame` fields (`event`, `payload`) survive encode → wire → decode       | —            |
 | Server rejection handling | Server returns HTTP error on upgrade                                         | `?reject=1`  |
 | Message ordering          | Send N frames, receive them in the same order                                | —            |
 | Room routing              | Connect with `?room=<id>`, verify isolation                                  | `?room=…`    |

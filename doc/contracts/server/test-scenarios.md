@@ -1,4 +1,4 @@
-# wspulse Server Integration Test Scenarios
+# wspulse Server Test Scenarios Contract
 
 > Version: 0 (unstable — aligned with protocol v0)
 > Applies to: `wspulse/server`
@@ -22,7 +22,7 @@ Server integration tests use real WebSocket connections. The test harness create
 | #   | Scenario                              | Behaviour Reference                     | Pass Condition                                                                             |
 | --- | ------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
 | 1   | Connect and receive OnConnect         | Callback ordering                       | `OnConnect` fires exactly once with valid `Connection`.                                    |
-| 2   | Send frame to connection              | `Server.Send`                           | Client receives the frame with correct `ID`, `Event`, `Payload`.                           |
+| 2   | Send frame to connection              | `Server.Send`                           | Client receives the frame with correct `Event`, `Payload`.                                 |
 | 3   | Broadcast to room                     | `Server.Broadcast`                      | All connections in the room receive the frame; connections in other rooms do not.           |
 | 4   | Client disconnect (clean close)       | Teardown                                | `OnDisconnect` fires with `nil` error. `Connection.Done()` closes.                        |
 | 5   | Client disconnect (transport drop)    | Teardown                                | `OnDisconnect` fires with non-nil error. `Connection.Done()` closes.                      |
