@@ -228,6 +228,7 @@ erroneously fire callbacks.
 - Enqueues the encoded frame into a bounded internal buffer.
 - Returns/resolves immediately (non-blocking).
 - A successful `send()` confirms the frame has been accepted into the local buffer. It does **not** guarantee the frame has been written to the transport or received by the server.
+- During normal operation, buffered frames are written to the transport in order (at-most-once — network delivery is not guaranteed). When `close()` is called, unwritten frames are discarded (see `close()` Semantics).
 - Raises `ConnectionClosedError` if the client is in `CLOSED` state.
 - If the buffer is full: raises `SendBufferFullError`. The caller decides how to handle backpressure (retry, discard, or close). Note: server-side broadcast uses head-drop for 1:N fanout; client-side send is 1:1 and must not silently discard frames.
 - Frames are delivered in enqueue order. No reordering.
@@ -250,6 +251,14 @@ considered failed and the transport must be dropped.
 
 Write timeout is treated identically to any other transport drop — the same
 callback sequence and reconnect logic apply, no special handling.
+
+**Error attribution:** The error passed to `onTransportDrop(err)` must reflect
+the **actual cause** of the transport drop. When a write timeout triggers the
+drop, `err` must be the write-timeout error, not a secondary error from the
+read side (e.g. "use of closed network connection" caused by the transport
+being closed from the write path). Implementations where read and write run in
+separate goroutines/coroutines must coordinate so that the first error detected
+is the one delivered to the callback.
 
 **Implementation note (non-normative):** How the deadline is enforced is
 language- and runtime-specific. Go sets a socket-level write deadline; Swift
