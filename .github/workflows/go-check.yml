@@ -4,9 +4,6 @@ on:
   workflow_call:
 
 jobs:
-  changelog-gate:
-    uses: wspulse/.github/.github/workflows/changelog-gate.yml@main
-
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
