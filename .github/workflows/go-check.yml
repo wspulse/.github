@@ -4,6 +4,9 @@ on:
   workflow_call:
 
 jobs:
+  changelog-gate:
+    uses: wspulse/.github/.github/workflows/changelog-gate.yml@main
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -13,24 +16,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
-      - name: CHANGELOG gate
-        run: |
-          set -euo pipefail
-          if [[ "${{ github.base_ref }}" != "main" ]]; then
-            echo "Not targeting main — skipping"
-            exit 0
-          fi
-          CHANGELOG_TOP=$(grep -m1 '## \[' CHANGELOG.md | sed 's/## \[\(.*\)\].*/\1/')
-          if [ -z "$CHANGELOG_TOP" ]; then
-            echo "Failed to parse top entry from CHANGELOG.md"
-            exit 1
-          fi
-          if [ "$CHANGELOG_TOP" = "Unreleased" ]; then
-            echo "Cannot merge to main with [Unreleased] CHANGELOG — bump the version first"
-            exit 1
-          fi
-          echo "CHANGELOG top: $CHANGELOG_TOP — OK"
 
       - name: Set up Go
         uses: actions/setup-go@v6
