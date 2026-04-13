@@ -22,8 +22,26 @@ jobs:
             echo "Failed to parse top entry from CHANGELOG.md"
             exit 1
           fi
-          if [ "$CHANGELOG_TOP" = "Unreleased" ]; then
-            echo "Cannot merge to main with [Unreleased] CHANGELOG — bump the version first"
+          if [ "$CHANGELOG_TOP" != "Unreleased" ]; then
+            echo "CHANGELOG top: [$CHANGELOG_TOP] — OK"
+            exit 0
+          fi
+          # [Unreleased] is allowed only when its section body is empty
+          # and a versioned entry follows it.
+          UNRELEASED_LINE=$(grep -n '^## \[Unreleased\]' CHANGELOG.md | head -1 | cut -d: -f1)
+          NEXT_LINE=$(awk "NR > $UNRELEASED_LINE && /^## \[/ { print NR; exit }" CHANGELOG.md)
+          if [ -z "$NEXT_LINE" ]; then
+            echo "ERROR: [Unreleased] has no versioned section below it — bump the version first"
             exit 1
           fi
-          echo "CHANGELOG top: $CHANGELOG_TOP — OK"
+          NEXT_SECTION=$(awk "NR == $NEXT_LINE" CHANGELOG.md | sed 's/## \[\(.*\)\].*/\1/')
+          if [ "$NEXT_SECTION" = "Unreleased" ]; then
+            echo "ERROR: multiple [Unreleased] sections found"
+            exit 1
+          fi
+          BODY=$(awk "NR > $UNRELEASED_LINE && NR < $NEXT_LINE" CHANGELOG.md | tr -d '[:space:]')
+          if [ -n "$BODY" ]; then
+            echo "ERROR: [Unreleased] section has content — move it under a versioned heading first"
+            exit 1
+          fi
+          echo "CHANGELOG: [Unreleased] is empty, versioned top is [$NEXT_SECTION] — OK"
