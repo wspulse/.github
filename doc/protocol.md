@@ -85,24 +85,16 @@ agnostic to the on-wire format (Protobuf, MessagePack, CBOR, etc.).
 
 ## Heartbeat
 
-wspulse uses a **dual heartbeat** model — both sides independently send
-WebSocket Ping control frames and monitor Pong replies.
+wspulse uses a **server-only heartbeat** model. The server sends WebSocket
+Ping control frames and monitors Pong replies to detect dead connections.
+Clients do not send their own Ping frames.
 
-**Server → Client:** The server sends a **Ping** every `pingPeriod`
-(default 10 s). Clients auto-reply with a **Pong** at the protocol layer
-(gorilla, browsers, and other standard WebSocket libraries handle this
-automatically). If the server receives no Pong within `pongWait`
-(default 30 s), it closes the connection.
-
-**Client → Server:** Native clients (Go, Node.js) **also** send their
-own **Ping** every `pingPeriod` (default 20 s). The server auto-replies
-with a **Pong** (gorilla default `PingHandler`). If the client receives
-no Pong within `pongWait` (default 60 s), it closes the socket and
-triggers a transport drop.
-
-> **Browser note:** The browser WebSocket API does not expose Ping/Pong
-> control frames. Browser clients rely entirely on the server-side
-> heartbeat for liveness detection.
+The server sends a **Ping** every `pingPeriod` (default 10 s). Clients
+auto-reply with a **Pong** at the protocol layer (gorilla, browsers, and
+other standard WebSocket libraries handle this automatically). If the
+server receives no Pong within `pongWait` (default 30 s), it closes the
+connection. The client detects this via a read error, which triggers a
+transport drop (and reconnect if enabled).
 
 ---
 
@@ -118,9 +110,6 @@ Client                           Server
   |                                |
   |<----------- Ping --------------|  (server pingPeriod, default 10 s)
   |------------ Pong ------------->|  (auto-reply)
-  |                                |
-  |------------ Ping ------------->|  (client pingPeriod, default 20 s)
-  |<----------- Pong --------------|  (auto-reply)
   |                                |
   |--------- Close frame --------->|  (normal close by client)
   |<-------- Close frame ----------|

@@ -31,34 +31,32 @@ All client libraries test against the same Go binary located at [`testserver/`](
 | `?reject=1`       | Server returns HTTP 403 on upgrade (simulates auth failure)    |
 | `?room=<id>`      | Join a specific room                                           |
 | `?id=<id>`        | Register a session ID (required for `/kick`)                   |
-| `?ignore_pings=1` | Server suppresses Pong replies (for heartbeat timeout testing) |
 
 ---
 
 ## Scenario Matrix
 
-Every client must implement tests for the following 11 scenarios. Error type names are conceptual — use the language-appropriate mapping from `interface.md`.
+Every client must implement tests for the following 10 scenarios. Error type names are conceptual — use the language-appropriate mapping from `interface.md`.
 
-| #   | Scenario                                                            | Behaviour Reference                  | Query Params      | Notes                                   |
-| --- | ------------------------------------------------------------------- | ------------------------------------ | ----------------- | --------------------------------------- |
-| 1   | Connect → send → echo → close clean                                 | Lifecycle: INIT → CONNECTED → CLOSED | —                 | Basic happy-path                        |
-| 2   | Server drops → `onTransportDrop` + `onDisconnect` (no reconnect)    | `onTransportDrop`, `onDisconnect`    | —                 | autoReconnect disabled                  |
-| 3   | Auto-reconnect: server drops → reconnects within maxRetries         | Auto-Reconnect steps 1–4             | `?id=…`           | Use `/kick` to trigger drop             |
-| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedError)`       | Auto-Reconnect step 6                | `?id=…`           | Use `/shutdown` to make all dials fail  |
-| 5   | `close()` during reconnect → loop stops, `onDisconnect(nil)`        | `close()` Semantics                  | `?id=…`           | Call `close()` during reconnect backoff |
-| 6   | `send()` on closed client → `ConnectionClosedError`                 | `send()` Semantics                   | —                 |                                         |
-| 7   | Heartbeat pong timeout → `ConnectionLostError`                      | Heartbeat: client-side               | `?ignore_pings=1` | Short `pingPeriod`/`pongWait` for speed |
-| 8   | Concurrent sends: no data race or interleaving                      | `send()` Semantics: ordering         | —                 | See [Threading note](#threading-note)   |
-| 9   | Concurrent `close()` + transport drop → `onDisconnect` exactly once | `close()` Semantics: idempotent      | —                 |                                         |
-| 10  | `onTransportRestore` fires after successful reconnect               | `onTransportRestore`                 | `?id=…`           | Use `/kick` then reconnect              |
-| 11  | `onTransportRestore` does not fire on initial connect               | `onTransportRestore`                 | —                 |                                         |
+| #   | Scenario                                                            | Behaviour Reference                  | Query Params | Notes                                   |
+| --- | ------------------------------------------------------------------- | ------------------------------------ | ------------ | --------------------------------------- |
+| 1   | Connect → send → echo → close clean                                 | Lifecycle: INIT → CONNECTED → CLOSED | —            | Basic happy-path                        |
+| 2   | Server drops → `onTransportDrop` + `onDisconnect` (no reconnect)    | `onTransportDrop`, `onDisconnect`    | —            | autoReconnect disabled                  |
+| 3   | Auto-reconnect: server drops → reconnects within maxRetries         | Auto-Reconnect steps 1–4             | `?id=…`      | Use `/kick` to trigger drop             |
+| 4   | Max retries exhausted → `onDisconnect(RetriesExhaustedError)`       | Auto-Reconnect step 6                | `?id=…`      | Use `/shutdown` to make all dials fail  |
+| 5   | `close()` during reconnect → loop stops, `onDisconnect(nil)`        | `close()` Semantics                  | `?id=…`      | Call `close()` during reconnect backoff |
+| 6   | `send()` on closed client → `ConnectionClosedError`                 | `send()` Semantics                   | —            |                                         |
+| 7   | Concurrent sends: no data race or interleaving                      | `send()` Semantics: ordering         | —            | See [Threading note](#threading-note)   |
+| 8   | Concurrent `close()` + transport drop → `onDisconnect` exactly once | `close()` Semantics: idempotent      | —            |                                         |
+| 9   | `onTransportRestore` fires after successful reconnect               | `onTransportRestore`                 | `?id=…`      | Use `/kick` then reconnect              |
+| 10  | `onTransportRestore` does not fire on initial connect               | `onTransportRestore`                 | —            |                                         |
 
 ### Threading Note
 
-Scenario 8 verifies that concurrent `send()` calls do not cause data races or message interleaving.
+Scenario 7 verifies that concurrent `send()` calls do not cause data races or message interleaving.
 
 - **Multi-threaded runtimes** (Go, Kotlin, Swift): implement as a scenario matrix test — launch N goroutines/coroutines each sending M frames, verify all arrive intact and in per-sender order.
-- **Single-threaded runtimes** (JavaScript/TypeScript): mark scenario 8 as N/A in the scenario matrix. Instead, add an equivalent test in the Additional Tests section (e.g. fire N sends via `Promise.all`, verify ordering and completeness).
+- **Single-threaded runtimes** (JavaScript/TypeScript): mark scenario 7 as N/A in the scenario matrix. Instead, add an equivalent test in the Additional Tests section (e.g. fire N sends via `Promise.all`, verify ordering and completeness).
 
 The concurrent-send behaviour **must** be tested in every client; only the placement differs.
 
@@ -82,10 +80,10 @@ Beyond the scenario matrix, every client must include these tests:
 
 | Runtime model   | Scenario matrix | Additional tests | Total |
 | --------------- | --------------- | ---------------- | ----- |
-| Multi-threaded  | 11              | 5                | 16    |
-| Single-threaded | 10 (sc.8 = N/A) | 6 (+concurrent)  | 16    |
+| Multi-threaded  | 10              | 5                | 15    |
+| Single-threaded | 9 (sc.7 = N/A)  | 6 (+concurrent)  | 15    |
 
-All clients must reach a minimum of **16 integration tests**.
+All clients must reach a minimum of **15 integration tests**.
 
 ---
 

@@ -276,30 +276,14 @@ indistinguishable from any other transport drop from the caller's perspective.
 
 ## Heartbeat
 
-wspulse uses a **dual heartbeat** model: both the server and the client independently send WebSocket **Ping** control frames and monitor **Pong** replies to detect dead connections.
-
-### Server-side heartbeat
+wspulse uses a **server-only heartbeat** model. The server sends WebSocket **Ping** control frames and monitors **Pong** replies to detect dead connections. Clients do not send their own Ping frames.
 
 - The server sends Ping every `pingPeriod` (default **10 s**).
 - If no Pong is received within `pongWait` (default **30 s**), the server closes the connection.
 - Clients auto-reply Pong at the protocol layer (handled by gorilla/websocket, browser engines, and other standard WebSocket libraries).
+- When the server closes a dead connection, the client detects it via a read error, which triggers a transport drop (and reconnect if enabled).
 
-### Client-side heartbeat
-
-- Native clients (Go, Node.js) **also** send their own Ping every `pingPeriod` (default **20 s**).
-- If no Pong is received within `pongWait` (default **60 s**), the client closes the socket, triggering a transport drop (and reconnect if enabled).
-- The server auto-replies Pong at the protocol layer (gorilla default `PingHandler`).
-- **Browser clients** cannot send Ping frames — the browser WebSocket API provides no programmatic access to Ping/Pong control frames. In browser environments the client-side heartbeat is a **no-op**; liveness detection relies entirely on the server-side heartbeat.
-
-### Why dual heartbeat?
-
-- **Independent fault detection** — each side detects the other's failure on its own schedule without a one-directional dependency.
-- **Staggered defaults** — the server uses a tight interval (10 s / 30 s) for fast resource reclamation; clients use a lenient interval (20 s / 60 s) suited for mobile and spotty networks.
-- **NAT keepalive** — client-initiated Ping keeps NAT/firewall state alive. Some corporate proxies only track client-originated traffic.
-
-### Configurability
-
-Both `pingPeriod` and `pongWait` are fully configurable on each side. Developers should adjust values to match their network environment and resource constraints. The constraint `pingPeriod < pongWait` must always hold.
+Dead-connection detection latency is `server.pingInterval + server.writeTimeout`, controlled by the server operator. This is the standard pattern used by Phoenix, socket.io, ActionCable, Ably, Pusher, and NATS.
 
 ---
 
@@ -329,7 +313,7 @@ Rules:
 
 1. **Enabled by default** — the logger must produce output without any user configuration. Users may replace or disable it via options.
 2. **Minimum log points** — the following events must be logged:
-   - `warn`: decode failure (frame dropped), write failure, pong timeout, retries exhausted.
+   - `warn`: decode failure (frame dropped), write failure, retries exhausted.
    - `info`: connected, reconnected, closing, transport dropped.
    - `debug`: reconnect attempt with delay.
 3. **Message prefix** — all log messages must start with `wspulse/client:`.
@@ -344,12 +328,11 @@ Every client lib must pass these behavioural tests against a live `wspulse/serve
 | --- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | 1   | Connect, send frame, receive echo, `close()` cleanly                                  | `onTransportDrop(nil)` → `onDisconnect(nil)`; `done` resolves                    |
 | 2   | Server drops connection (auto-reconnect off)                                          | `onTransportDrop` → `onDisconnect(ConnectionLostError)`                          |
-| 3   | Server drops; client reconnects within maxRetries                                     | `onTransportDrop` → `onReconnect(0)` → `onMessage` works again                   |
+| 3   | Server drops; client reconnects within maxRetries                                     | `onTransportDrop` → `onTransportRestore()` → `onMessage` works again              |
 | 4   | Server drops repeatedly; max retries exhausted                                        | `onDisconnect(RetriesExhaustedError)` fires exactly once                         |
 | 5   | `close()` called during reconnect loop                                                | Loop stops; `onDisconnect(nil)` fires; no further callbacks                      |
 | 6   | `send()` after `close()`                                                              | Raises / returns `ConnectionClosedError`                                         |
-| 7   | Heartbeat: server closes after no Pong (simulated)                                    | Client reconnects (if auto-reconnect on)                                         |
-| 8   | Concurrent `send()` from multiple threads/goroutines/tasks                            | No data race; all frames delivered in order per sender                           |
-| 9   | `onDisconnect` + transport drop race (close() called simultaneously with server drop) | `onTransportDrop` fires exactly once; `onDisconnect` fires exactly once          |
-| 10  | `close()` called during in-flight `connect()` dial                                    | Zero callbacks fire; `connect()` throws `ConnectionClosedError`; `done` resolves |
-| 11  | Write timeout: socket write stalls beyond `writeWait`                                 | `onTransportDrop(err)` fires with non-nil error; reconnects if auto-reconnect on |
+| 7   | Concurrent `send()` from multiple threads/goroutines/tasks                            | No data race; all frames delivered in order per sender                           |
+| 8   | `onDisconnect` + transport drop race (close() called simultaneously with server drop) | `onTransportDrop` fires exactly once; `onDisconnect` fires exactly once          |
+| 9   | `close()` called during in-flight `connect()` dial                                    | Zero callbacks fire; `connect()` throws `ConnectionClosedError`; `done` resolves |
+| 10  | Write timeout: socket write stalls beyond `writeWait`                                 | `onTransportDrop(err)` fires with non-nil error; reconnects if auto-reconnect on |
