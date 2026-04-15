@@ -116,14 +116,15 @@ When a session is suspended (within the resume window), frames are buffered in a
 
 The server uses RFC 6455 Ping/Pong control frames for liveness detection.
 
-| Parameter    | Default | Valid Range       | Description                                                |
-| ------------ | ------- | ----------------- | ---------------------------------------------------------- |
-| `pingPeriod` | 10 s    | (0, 5m]           | Server sends a Ping every `pingPeriod`.                    |
-| `pongWait`   | 30 s    | (pingPeriod, 10m] | If no Pong arrives within `pongWait`, the connection dies. |
+| Parameter      | Default | Valid Range | Description                                                       |
+| -------------- | ------- | ----------- | ----------------------------------------------------------------- |
+| `pingInterval` | 20 s    | (writeTimeout, 1m] | Server sends a Ping every `pingInterval`.                    |
+| `writeTimeout` | 10 s    | (0, 30s]    | Deadline for a single write operation, including the synchronous Ping/Pong round-trip. |
 
+- The server's `Ping(ctx)` is synchronous: it sends a Ping frame and blocks until the Pong reply arrives or the `writeTimeout` context expires. If the Pong does not arrive within `writeTimeout`, the connection is considered dead.
+- The constraint `pingInterval > writeTimeout` must always hold.
 - Clients auto-reply Pong at the WebSocket protocol layer (no application-level handling needed).
-- The server also auto-replies to client-initiated Pings (gorilla default `PingHandler`).
-- The constraint `pingPeriod < pongWait` must always hold.
+- The server also auto-replies to client-initiated Pings (default ping handler).
 
 ---
 

@@ -123,8 +123,8 @@ All options are set via functional option builders. Invalid values panic at setu
 | `WithOnDisconnect(fn)`         | `func(Connection, error)`        | --             | --                    |
 | `WithOnTransportDrop(fn)`      | `func(Connection, error)`        | --             | --                    |
 | `WithOnTransportRestore(fn)`   | `func(Connection)`               | --             | --                    |
-| `WithHeartbeat(ping, pong)` | `(time.Duration, time.Duration)` | 10 s / 30 s    | (0, 5m] / (ping, 10m] |
-| `WithWriteWait(d)`          | `time.Duration`                  | 10 s           | (0, 30s]              |
+| `WithPingInterval(d)`       | `time.Duration`                  | 20 s           | (writeTimeout, 1m]    |
+| `WithWriteTimeout(d)`       | `time.Duration`                  | 10 s           | (0, 30s]              |
 | `WithMaxMessageSize(n)`     | `int64`                          | 512 B          | [1, 64 MiB]           |
 | `WithSendBufferSize(n)`     | `int`                            | 256 frames     | [1, 4096]             |
 | `WithResumeWindow(d)`       | `time.Duration`                  | 0 (disabled)   | [0, +∞)               |
@@ -155,30 +155,28 @@ All validation panic messages must use the prefix `wspulse:` followed by a space
 | #   | Option               | Field        | Condition    | Panic message                                                                         |
 | --- | -------------------- | ------------ | ------------ | ------------------------------------------------------------------------------------- |
 | 1   | `NewServer`          | `connect`    | `!= nil`     | `wspulse: NewServer: connect must not be nil`                                         |
-| 2   | `WithHeartbeat`      | `pingPeriod` | `> 0`        | `wspulse: WithHeartbeat: pingPeriod must be positive and strictly less than pongWait` |
-| 3   | `WithHeartbeat`      | `pongWait`   | `> 0`        | _(same as #2 — combined check)_                                                       |
-| 4   | `WithHeartbeat`      | `pingPeriod` | `< pongWait` | _(same as #2 — combined check)_                                                       |
-| 5   | `WithHeartbeat`      | `pingPeriod` | `<= 5 m`     | `wspulse: WithHeartbeat: pingPeriod exceeds maximum (5m)`                             |
-| 6   | `WithHeartbeat`      | `pongWait`   | `<= 10 m`    | `wspulse: WithHeartbeat: pongWait exceeds maximum (10m)`                              |
-| 7   | `WithWriteWait`      | `d`          | `> 0`        | `wspulse: WithWriteWait: duration must be positive`                                   |
-| 8   | `WithWriteWait`      | `d`          | `<= 30 s`    | `wspulse: WithWriteWait: duration exceeds maximum (30s)`                              |
-| 9   | `WithMaxMessageSize` | `n`          | `>= 1`       | `wspulse: WithMaxMessageSize: n must be at least 1`                                   |
-| 10  | `WithMaxMessageSize` | `n`          | `<= 64 MiB`  | `wspulse: WithMaxMessageSize: n exceeds maximum (64 MiB)`                             |
-| 11  | `WithSendBufferSize` | `n`          | `>= 1`       | `wspulse: WithSendBufferSize: n must be at least 1`                                   |
-| 12  | `WithSendBufferSize` | `n`          | `<= 4096`    | `wspulse: WithSendBufferSize: n exceeds maximum (4096)`                               |
-| 13  | `WithResumeWindow`   | `d`          | `>= 0`       | `wspulse: WithResumeWindow: duration must be non-negative`                            |
-| 14  | `WithCodec`          | `codec`      | `!= nil`     | `wspulse: WithCodec: codec must not be nil`                                           |
-| 15  | `WithCheckOrigin`    | `fn`         | `!= nil`     | `wspulse: WithCheckOrigin: fn must not be nil`                                        |
-| 16  | `WithLogger`         | `l`          | `!= nil`     | `wspulse: WithLogger: logger must not be nil`                                         |
+| 2   | `WithPingInterval`   | `d`          | `> 0`                    | `wspulse: WithPingInterval: duration must be positive`                                |
+| 3   | `WithPingInterval`   | `d`          | `<= 1 m`                | `wspulse: WithPingInterval: duration exceeds maximum (1m0s)`                          |
+| 4   | `WithWriteTimeout`   | `d`          | `> 0`                    | `wspulse: WithWriteTimeout: duration must be positive`                                |
+| 5   | `WithWriteTimeout`   | `d`          | `<= 30 s`               | `wspulse: WithWriteTimeout: duration exceeds maximum (30s)`                           |
+| 6   | `NewHub`             | cross        | `pingInterval > writeTimeout` | `wspulse: NewHub: pingInterval must be greater than writeTimeout`                |
+| 7   | `WithMaxMessageSize` | `n`          | `>= 1`                  | `wspulse: WithMaxMessageSize: n must be at least 1`                                   |
+| 8   | `WithMaxMessageSize` | `n`          | `<= 64 MiB`             | `wspulse: WithMaxMessageSize: n exceeds maximum (64 MiB)`                             |
+| 9   | `WithSendBufferSize` | `n`          | `>= 1`                  | `wspulse: WithSendBufferSize: n must be at least 1`                                   |
+| 10  | `WithSendBufferSize` | `n`          | `<= 4096`               | `wspulse: WithSendBufferSize: n exceeds maximum (4096)`                               |
+| 11  | `WithResumeWindow`   | `d`          | `>= 0`                  | `wspulse: WithResumeWindow: duration must be non-negative`                            |
+| 12  | `WithCodec`          | `codec`      | `!= nil`                | `wspulse: WithCodec: codec must not be nil`                                           |
+| 13  | `WithCheckOrigin`    | `fn`         | `!= nil`                | `wspulse: WithCheckOrigin: fn must not be nil`                                        |
+| 14  | `WithLogger`         | `l`          | `!= nil`                | `wspulse: WithLogger: logger must not be nil`                                         |
 
 Notes:
 
-- Rules #2–#4 are enforced by a single combined check in `WithHeartbeat`.
+- `WithPingInterval` and `WithWriteTimeout` are validated independently at option time; the cross-constraint (`pingInterval > writeTimeout`) is enforced by `NewHub` after all options are applied (rule 6).
 - `WithResumeWindow(0)` is valid — it disables session resumption (the default).
 - `maxMessageSize` minimum is 1 (unlike client where 0 disables the limit). The server always enforces a message size limit.
 - Callback options (`WithOnConnect`, `WithOnMessage`, `WithOnDisconnect`, `WithOnTransportDrop`, `WithOnTransportRestore`) accept `nil` — nil means no callback registered.
 - Upper bounds are intentionally conservative for a v0 library. They can be relaxed in future versions without breaking existing callers.
-- Boundary values (e.g. `sendBufferSize = 4096`, `writeWait = 30s`) are valid and must be accepted.
+- Boundary values (e.g. `sendBufferSize = 4096`, `writeTimeout = 30s`) are valid and must be accepted.
 
 ---
 
