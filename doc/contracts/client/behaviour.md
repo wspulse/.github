@@ -278,8 +278,8 @@ indistinguishable from any other transport drop from the caller's perspective.
 
 wspulse uses a **server-only heartbeat** model. The server sends WebSocket **Ping** control frames and monitors **Pong** replies to detect dead connections. Clients do not send their own Ping frames.
 
-- The server sends Ping every `pingPeriod` (default **10 s**).
-- If no Pong is received within `pongWait` (default **30 s**), the server closes the connection.
+- The server sends Ping every `pingInterval` (default **20 s**).
+- If no Pong is received within `writeTimeout` (default **10 s**), the server closes the connection.
 - Clients auto-reply Pong at the protocol layer (handled by gorilla/websocket, browser engines, and other standard WebSocket libraries).
 - When the server closes a dead connection, the client detects it via a read error, which triggers a transport drop (and reconnect if enabled).
 

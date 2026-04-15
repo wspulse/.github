@@ -47,7 +47,7 @@ Server integration tests use real WebSocket connections. The test harness create
 | Broadcast after Close                 | `Server.Broadcast` returns `ErrServerClosed`.                                               |
 | Send buffer full (direct Send)        | `Connection.Send` returns `ErrSendBufferFull` when buffer is at capacity.                   |
 | Broadcast backpressure (drop-oldest)  | Slow consumer's oldest frame is dropped; other consumers receive all frames.                |
-| Heartbeat timeout                     | Server closes connection after no Pong within `pongWait`. `OnDisconnect` fires.             |
+| Heartbeat timeout                     | Server closes connection after no Pong within `writeTimeout`. `OnDisconnect` fires.         |
 | OnMessage ordering                    | Frames sent by client arrive at `OnMessage` in order.                                       |
 | Resume buffer replay ordering         | Frames buffered during suspension are replayed in original order after reconnect.            |
 | GetConnections includes suspended     | `GetConnections` returns suspended sessions within the resume window.                       |
