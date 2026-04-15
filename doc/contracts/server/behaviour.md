@@ -1,9 +1,9 @@
-# wspulse Server Behaviour Contract
+# wspulse Hub Behaviour Contract
 
 > Version: 0 (unstable — aligned with protocol v0)
-> Applies to: `wspulse/server`
+> Applies to: `wspulse/hub`
 
-This document defines the **behavioural guarantees** of the wspulse server. These are promises to application-layer consumers — not implementation details. For internal architecture (goroutine model, pump design) see [`server/doc/internals.md`](https://github.com/wspulse/server/blob/main/doc/internals.md).
+This document defines the **behavioural guarantees** of the wspulse hub. These are promises to application-layer consumers — not implementation details. For internal architecture (goroutine model, pump design) see [`hub/doc/internals.md`](https://github.com/wspulse/hub/blob/main/doc/internals.md).
 
 For API surface see [`interface.md`](./interface.md).
 For wire-level details see [`protocol.md`](https://github.com/wspulse/.github/blob/main/doc/protocol.md).
@@ -24,7 +24,7 @@ stateDiagram-v2
 
     SUSPENDED --> CONNECTED : same connectionID reconnects within window
     SUSPENDED --> CLOSED : grace timer expires
-    SUSPENDED --> CLOSED : Kick() or server.Close()
+    SUSPENDED --> CLOSED : Kick() or hub.Close()
     SUSPENDED --> CLOSED : Connection.Close() called
 
     CLOSED --> [*]
@@ -85,9 +85,9 @@ The `error` parameter passed to `OnDisconnect` represents the **cause of session
 | No resume window — transport dies                        | _(not called)_          | transport error            | Direct passthrough; no suspend phase.                            |
 | Resume — grace timer expires                             | transport error         | `nil`                      | Session ended due to timeout, not the original transport error.  |
 | Resume — `Connection.Close()` races with transport death | _(not called)_          | transport error            | Session never entered SUSPENDED; `Close()` prevented suspend.    |
-| `Server.Kick()`                                          | _(not called)_          | `nil`                      | Application-initiated termination.                               |
+| `Hub.Kick()`                                             | _(not called)_          | `nil`                      | Application-initiated termination.                               |
 | Duplicate connectionID                                   | _(not called)_          | `ErrDuplicateConnectionID` | Old session kicked by new registration.                          |
-| `Server.Close()`                                         | _(not called)_          | `ErrServerClosed`          | Server shutting down.                                            |
+| `Hub.Close()`                                            | _(not called)_          | `ErrHubClosed`             | Hub shutting down.                                               |
 | `Connection.Close()` while SUSPENDED                     | transport error         | `nil`                      | Application-initiated; grace timer fires immediately with `nil`. |
 
 **Key invariant**: when `OnTransportDrop` fires with the transport error, `OnDisconnect` receives `nil`. When `OnTransportDrop` does not fire, `OnDisconnect` receives the transport error directly. The transport error is delivered **exactly once** across the two callbacks.
@@ -101,8 +101,8 @@ Each connection maintains a bounded send buffer (default 256 frames, configurabl
 | Operation          | Buffer full behaviour                                                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Connection.Send`  | Returns `ErrSendBufferFull`. The caller decides how to handle (retry, discard, or close).                                                                                     |
-| `Server.Send`      | Returns `ErrSendBufferFull`.                                                                                                                                                  |
-| `Server.Broadcast` | **Drop-oldest**: the oldest frame in the target connection's buffer is discarded to make room. If the buffer is still full after dropping, the new frame is silently dropped. |
+| `Hub.Send`         | Returns `ErrSendBufferFull`.                                                                                                                                                  |
+| `Hub.Broadcast`    | **Drop-oldest**: the oldest frame in the target connection's buffer is discarded to make room. If the buffer is still full after dropping, the new frame is silently dropped. |
 
 This ensures a slow connection cannot block the hub event loop or stall broadcasts to other healthy connections.
 
@@ -114,16 +114,16 @@ When a session is suspended (within the resume window), frames are buffered in a
 
 ## Heartbeat
 
-The server uses RFC 6455 Ping/Pong control frames for liveness detection.
+The hub uses RFC 6455 Ping/Pong control frames for liveness detection.
 
-| Parameter    | Default | Valid Range       | Description                                                |
-| ------------ | ------- | ----------------- | ---------------------------------------------------------- |
-| `pingPeriod` | 10 s    | (0, 5m]           | Server sends a Ping every `pingPeriod`.                    |
-| `pongWait`   | 30 s    | (pingPeriod, 10m] | If no Pong arrives within `pongWait`, the connection dies. |
+| Parameter      | Default | Valid Range          | Description                                                                              |
+| -------------- | ------- | -------------------- | ---------------------------------------------------------------------------------------- |
+| `pingInterval` | 20 s    | (writeTimeout, 1m]   | Hub sends a Ping every `pingInterval` via a dedicated `pingPump` goroutine.              |
+| `writeTimeout` | 10 s    | (0, 30s]             | Per-write deadline and Ping timeout. If no Pong arrives within this window, the connection dies. |
 
+- `pingInterval` must be strictly greater than `writeTimeout`. `NewHub` panics at construction time if this constraint is violated.
 - Clients auto-reply Pong at the WebSocket protocol layer (no application-level handling needed).
-- The server also auto-replies to client-initiated Pings (gorilla default `PingHandler`).
-- The constraint `pingPeriod < pongWait` must always hold.
+- The hub also auto-replies to client-initiated Pings.
 
 ---
 
@@ -131,7 +131,7 @@ The server uses RFC 6455 Ping/Pong control frames for liveness detection.
 
 Normal and abnormal teardown follow the same cleanup path:
 
-1. Transport read error occurs (close frame, network drop, or read deadline exceeded).
+1. Transport read error occurs (close frame, network drop, or ping timeout).
 2. Hub is notified of the transport death.
 3. If `resumeWindow > 0`: session enters `SUSPENDED`, grace timer starts.
 4. If `resumeWindow == 0`: session is removed, `OnDisconnect` fires.
@@ -143,7 +143,7 @@ Normal and abnormal teardown follow the same cleanup path:
 
 ## Kick Semantics
 
-`Server.Kick(connectionID)` always destroys the session immediately:
+`Hub.Kick(connectionID)` always destroys the session immediately:
 
 - **Bypasses the resume window** — the session is never suspended. `OnDisconnect` fires immediately.
 - **Hub-serialized** — the kick request is routed through the hub event loop to prevent races with concurrent state mutations (register, transport-died, grace-expired).
@@ -156,7 +156,7 @@ Normal and abnormal teardown follow the same cleanup path:
 
 When a new connection registers with a `connectionID` that already exists:
 
-1. The **old** session is kicked immediately (same as `Server.Kick`).
+1. The **old** session is kicked immediately (same as `Hub.Kick`).
 2. `OnDisconnect` fires for the old session with `ErrDuplicateConnectionID`.
 3. The **new** session is registered normally, and `OnConnect` fires.
 
@@ -166,7 +166,7 @@ This applies regardless of whether the old session is `CONNECTED` or `SUSPENDED`
 
 ## Graceful Shutdown
 
-`Server.Close()`:
+`Hub.Close()`:
 
 1. Sends WebSocket close frames to all connected clients.
 2. Drains in-flight registration messages.
@@ -179,9 +179,9 @@ This applies regardless of whether the old session is `CONNECTED` or `SUSPENDED`
 
 ## Error Wrapping
 
-Server errors follow this format:
+Hub errors follow this format:
 
 - Sentinel errors: `errors.New("wspulse: <description>")`
 - Wrapped errors: `fmt.Errorf("wspulse: <context>: %w", err)`
 
-All server errors are prefixed with `wspulse:` for consistent identification.
+All hub errors are prefixed with `wspulse:` for consistent identification.
