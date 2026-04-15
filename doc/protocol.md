@@ -93,7 +93,7 @@ The server sends a **Ping** every `pingInterval` (default 20 s). Clients
 auto-reply with a **Pong** at the protocol layer (browsers and other
 standard WebSocket libraries handle this automatically). The server's
 Ping call is synchronous — it sends a Ping and blocks until the Pong
-reply arrives or the `writeTimeout` (default 10 s) context expires. If
+reply arrives or the write deadline (`writeTimeout`, default 10 s) expires. If
 no Pong arrives within `writeTimeout`, the server closes the connection.
 The client detects this via a read error, which triggers a transport
 drop (and reconnect if enabled).
