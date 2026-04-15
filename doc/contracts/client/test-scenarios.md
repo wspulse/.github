@@ -13,7 +13,9 @@ For behavioural requirements see [`behaviour.md`](./behaviour.md).
 
 ## Shared Testserver
 
-All client libraries test against the same Go binary located at [`testserver/`](../../../testserver/). It runs a standard `wspulse/server` with control endpoints for test orchestration.
+> **Outdated** — the `testserver/` module has been removed. This section and the Testserver Lifecycle section below will be redesigned. The control API and query parameter contracts remain as reference for each SDK's embedded test infrastructure.
+
+All client libraries test against a wspulse/server instance with control endpoints for test orchestration.
 
 ### Control API
 
@@ -89,7 +91,9 @@ All clients must reach a minimum of **15 integration tests**.
 
 ## Testserver Lifecycle
 
-Each client library is responsible for starting/stopping the testserver during its test run. Common strategies:
+> **Outdated** — the `testserver/` module has been removed. This section will be redesigned.
+
+Each client library is responsible for starting/stopping the test server during its test run. Common strategies:
 
 - **Go**: `exec.Command` in `TestMain`.
 - **TypeScript**: vitest `globalSetup` / `globalTeardown`.
