@@ -85,23 +85,18 @@ agnostic to the on-wire format (Protobuf, MessagePack, CBOR, etc.).
 
 ## Heartbeat
 
-wspulse uses a **server-initiated heartbeat** model — the server sends
-WebSocket Ping control frames and monitors Pong replies.
+wspulse uses a **server-only heartbeat** model. The server sends WebSocket
+Ping control frames and monitors Pong replies to detect dead connections.
+Clients do not send their own Ping frames.
 
-**Server → Client:** The server sends a **Ping** every `pingInterval`
-(default 20 s) via a dedicated `pingPump` goroutine. Each Ping blocks
-synchronously until the Pong reply arrives or `writeTimeout` (default 10 s)
-elapses. If no Pong arrives within `writeTimeout`, the server closes the
-connection. The constraint `pingInterval > writeTimeout` is always enforced.
-
-Standard WebSocket clients (browsers, `coder/websocket`, gorilla, and other
-libraries) auto-reply Pong at the protocol layer — no application-level
-handling is needed. Native clients (Go, Node.js, etc.) may also send their
-own Pings for client-side dead-connection detection; the server auto-replies.
-
-> **Browser note:** The browser WebSocket API does not expose Ping/Pong
-> control frames. Browser clients rely entirely on the server-side
-> heartbeat for liveness detection.
+The server sends a **Ping** every `pingInterval` (default 20 s). Clients
+auto-reply with a **Pong** at the protocol layer (browsers and other
+standard WebSocket libraries handle this automatically). The server's
+Ping call is synchronous — it sends a Ping and blocks until the Pong
+reply arrives or the write deadline (`writeTimeout`, default 10 s) expires. If
+no Pong arrives within `writeTimeout`, the server closes the connection.
+The client detects this via a read error, which triggers a transport
+drop (and reconnect if enabled).
 
 ---
 

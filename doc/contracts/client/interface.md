@@ -73,7 +73,6 @@ Every implementation must support these options:
 | `onTransportDrop`    | `(error) → void`                    | no-op       | Called each time the underlying transport drops (before any reconnect).                                                                                                                                        |
 | `onTransportRestore` | `() → void`                         | no-op       | Called after a successful reconnect when the new transport is ready and pumps are running. Does not fire on the initial connection.                                                                             |
 | `autoReconnect`   | `(maxRetries, baseDelay, maxDelay)` | disabled    | Enable exponential backoff reconnect. `maxRetries = 0` means unlimited.                                                                                                                                        |
-| `heartbeat`       | `(pingPeriod, pongWait)`            | 20 s / 60 s | Client-side Ping/Pong interval. The client sends Ping every `pingPeriod` and closes the socket if no Pong arrives within `pongWait`. Browser clients: no-op (browser handles Ping/Pong at the protocol level). |
 | `writeWait`       | duration                            | 10 s        | Deadline for a single write operation.                                                                                                                                                                         |
 | `maxMessageSize`  | bytes (int)                         | 1 MiB       | Max inbound message size. Connection closed if exceeded.                                                                                                                                                       |
 | `sendBufferSize`  | frames (int)                        | 256         | Outbound send buffer capacity (number of frames). When full, `send()` returns `SendBufferFullError`. During reconnect, buffered frames are delivered after the new transport is established.                    |
@@ -96,23 +95,18 @@ All validation error messages must use the prefix `wspulse:` followed by a space
 | 2   | `maxMessageSize`           | `<= 64 MiB`                  | `wspulse: maxMessageSize exceeds maximum (64 MiB)`                            |
 | 3   | `writeWait`                | `> 0`                        | `wspulse: writeWait must be positive`                                         |
 | 4   | `writeWait`                | `<= 30 s`                    | `wspulse: writeWait exceeds maximum (30s)`                                    |
-| 5   | `heartbeat.pingPeriod`     | `> 0`                        | `wspulse: heartbeat.pingPeriod must be positive`                              |
-| 6   | `heartbeat.pingPeriod`     | `<= 1 m`                     | `wspulse: heartbeat.pingPeriod exceeds maximum (1m)`                          |
-| 7   | `heartbeat.pongWait`       | `> 0`                        | `wspulse: heartbeat.pongWait must be positive`                                |
-| 8   | `heartbeat.pongWait`       | `<= 2 m`                     | `wspulse: heartbeat.pongWait exceeds maximum (2m)`                            |
-| 9   | `heartbeat.pingPeriod`     | `< heartbeat.pongWait`       | `wspulse: heartbeat.pingPeriod must be strictly less than heartbeat.pongWait` |
-| 10  | `autoReconnect.maxRetries` | `>= 0`                       | `wspulse: autoReconnect.maxRetries must be non-negative`                      |
-| 11  | `autoReconnect.baseDelay`  | `> 0`                        | `wspulse: autoReconnect.baseDelay must be positive`                           |
-| 12  | `autoReconnect.baseDelay`  | `<= 1 m`                     | `wspulse: autoReconnect.baseDelay exceeds maximum (1m)`                       |
-| 13  | `autoReconnect.maxDelay`   | `>= autoReconnect.baseDelay` | `wspulse: autoReconnect.maxDelay must be >= autoReconnect.baseDelay`          |
-| 14  | `autoReconnect.maxDelay`   | `<= 5 m`                     | `wspulse: autoReconnect.maxDelay exceeds maximum (5m)`                        |
-| 15  | `autoReconnect.maxRetries` | `<= 32` (when `> 0`)         | `wspulse: autoReconnect.maxRetries exceeds maximum (32)`                      |
-| 16  | `sendBufferSize`           | `>= 1`                       | `wspulse: sendBufferSize must be at least 1`                                  |
-| 17  | `sendBufferSize`           | `<= 4096`                    | `wspulse: sendBufferSize exceeds maximum (4096)`                              |
+| 5   | `autoReconnect.maxRetries` | `>= 0`                       | `wspulse: autoReconnect.maxRetries must be non-negative`                      |
+| 6   | `autoReconnect.baseDelay`  | `> 0`                        | `wspulse: autoReconnect.baseDelay must be positive`                           |
+| 7   | `autoReconnect.baseDelay`  | `<= 1 m`                     | `wspulse: autoReconnect.baseDelay exceeds maximum (1m)`                       |
+| 8   | `autoReconnect.maxDelay`   | `>= autoReconnect.baseDelay` | `wspulse: autoReconnect.maxDelay must be >= autoReconnect.baseDelay`          |
+| 9   | `autoReconnect.maxDelay`   | `<= 5 m`                     | `wspulse: autoReconnect.maxDelay exceeds maximum (5m)`                        |
+| 10  | `autoReconnect.maxRetries` | `<= 32` (when `> 0`)         | `wspulse: autoReconnect.maxRetries exceeds maximum (32)`                      |
+| 11  | `sendBufferSize`           | `>= 1`                       | `wspulse: sendBufferSize must be at least 1`                                  |
+| 12  | `sendBufferSize`           | `<= 4096`                    | `wspulse: sendBufferSize exceeds maximum (4096)`                              |
 
 Notes:
 
-- **URL scheme handling**: `http://` is auto-converted to `ws://`, `https://` to `wss://`. Matching is case-insensitive per RFC 3986 (`HTTP://`, `Http://` are accepted). `ws://` and `wss://` are accepted as-is. Unsupported or missing schemes must be rejected immediately at setup time (panic, throw, or precondition failure per language convention) with a `wspulse:`-prefixed error message. Implementations where the underlying WebSocket library already provides a clear error for invalid schemes (Go gorilla, Node.js ws) may delegate this validation.
+- **URL scheme handling**: `http://` is auto-converted to `ws://`, `https://` to `wss://`. Matching is case-insensitive per RFC 3986 (`HTTP://`, `Http://` are accepted). `ws://` and `wss://` are accepted as-is. Unsupported or missing schemes must be rejected immediately at setup time (panic, throw, or precondition failure per language convention) with a `wspulse:`-prefixed error message. Implementations where the underlying WebSocket library already provides a clear error for invalid schemes (Go coder/websocket, Node.js ws) may delegate this validation.
 
 - `maxMessageSize = 0` means disabled (no size limit enforced).
 - `autoReconnect.maxRetries = 0` means unlimited retries.
