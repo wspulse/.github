@@ -280,7 +280,7 @@ wspulse uses a **server-only heartbeat** model. The server sends WebSocket **Pin
 
 - The server sends Ping every `pingInterval` (default **20 s**).
 - If no Pong is received within `writeTimeout` (default **10 s**), the server closes the connection.
-- Clients auto-reply Pong at the protocol layer (handled by gorilla/websocket, browser engines, and other standard WebSocket libraries).
+- Clients auto-reply Pong at the protocol layer (handled by standard WebSocket libraries and browser engines).
 - When the server closes a dead connection, the client detects it via a read error, which triggers a transport drop (and reconnect if enabled).
 
 Dead-connection detection latency is `server.pingInterval + server.writeTimeout`, controlled by the server operator. This is the standard pattern used by Phoenix, socket.io, ActionCable, Ably, Pusher, and NATS.
