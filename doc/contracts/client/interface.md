@@ -73,8 +73,8 @@ Every implementation must support these options:
 | `onTransportDrop`    | `(error) → void`                    | no-op       | Called each time the underlying transport drops (before any reconnect).                                                                                                                                        |
 | `onTransportRestore` | `() → void`                         | no-op       | Called after a successful reconnect when the new transport is ready and pumps are running. Does not fire on the initial connection.                                                                             |
 | `autoReconnect`   | `(maxRetries, baseDelay, maxDelay)` | disabled    | Enable exponential backoff reconnect. `maxRetries = 0` means unlimited.                                                                                                                                        |
-| `heartbeat`       | `(pingPeriod, pongWait)`            | 20 s / 60 s | Client-side Ping/Pong interval. The client sends Ping every `pingPeriod` and closes the socket if no Pong arrives within `pongWait`. Browser clients: no-op (browser handles Ping/Pong at the protocol level). |
-| `writeWait`       | duration                            | 10 s        | Deadline for a single write operation.                                                                                                                                                                         |
+| `pingInterval`    | duration                            | 20 s        | Interval between client-sent Ping frames. Browser clients: no-op (browser handles Ping/Pong at the protocol level). Must be in (0, 1 m].                                                                      |
+| `writeTimeout`    | duration                            | 10 s        | Deadline for a single write operation. Also used as the pong deadline — if no Pong arrives within `writeTimeout` after a Ping, the connection is considered dead. Must be in (0, 30 s].                         |
 | `maxMessageSize`  | bytes (int)                         | 1 MiB       | Max inbound message size. Connection closed if exceeded.                                                                                                                                                       |
 | `sendBufferSize`  | frames (int)                        | 256         | Outbound send buffer capacity (number of frames). When full, `send()` returns `SendBufferFullError`. During reconnect, buffered frames are delivered after the new transport is established.                    |
 | `dialHeaders`     | map\<string, string\>               | none        | Extra HTTP headers sent during WebSocket upgrade.                                                                                                                                                              |
@@ -94,21 +94,18 @@ All validation error messages must use the prefix `wspulse:` followed by a space
 | --- | -------------------------- | ---------------------------- | ----------------------------------------------------------------------------- |
 | 1   | `maxMessageSize`           | `>= 0`                       | `wspulse: maxMessageSize must be non-negative`                                |
 | 2   | `maxMessageSize`           | `<= 64 MiB`                  | `wspulse: maxMessageSize exceeds maximum (64 MiB)`                            |
-| 3   | `writeWait`                | `> 0`                        | `wspulse: writeWait must be positive`                                         |
-| 4   | `writeWait`                | `<= 30 s`                    | `wspulse: writeWait exceeds maximum (30s)`                                    |
-| 5   | `heartbeat.pingPeriod`     | `> 0`                        | `wspulse: heartbeat.pingPeriod must be positive`                              |
-| 6   | `heartbeat.pingPeriod`     | `<= 1 m`                     | `wspulse: heartbeat.pingPeriod exceeds maximum (1m)`                          |
-| 7   | `heartbeat.pongWait`       | `> 0`                        | `wspulse: heartbeat.pongWait must be positive`                                |
-| 8   | `heartbeat.pongWait`       | `<= 2 m`                     | `wspulse: heartbeat.pongWait exceeds maximum (2m)`                            |
-| 9   | `heartbeat.pingPeriod`     | `< heartbeat.pongWait`       | `wspulse: heartbeat.pingPeriod must be strictly less than heartbeat.pongWait` |
-| 10  | `autoReconnect.maxRetries` | `>= 0`                       | `wspulse: autoReconnect.maxRetries must be non-negative`                      |
-| 11  | `autoReconnect.baseDelay`  | `> 0`                        | `wspulse: autoReconnect.baseDelay must be positive`                           |
-| 12  | `autoReconnect.baseDelay`  | `<= 1 m`                     | `wspulse: autoReconnect.baseDelay exceeds maximum (1m)`                       |
-| 13  | `autoReconnect.maxDelay`   | `>= autoReconnect.baseDelay` | `wspulse: autoReconnect.maxDelay must be >= autoReconnect.baseDelay`          |
-| 14  | `autoReconnect.maxDelay`   | `<= 5 m`                     | `wspulse: autoReconnect.maxDelay exceeds maximum (5m)`                        |
-| 15  | `autoReconnect.maxRetries` | `<= 32` (when `> 0`)         | `wspulse: autoReconnect.maxRetries exceeds maximum (32)`                      |
-| 16  | `sendBufferSize`           | `>= 1`                       | `wspulse: sendBufferSize must be at least 1`                                  |
-| 17  | `sendBufferSize`           | `<= 4096`                    | `wspulse: sendBufferSize exceeds maximum (4096)`                              |
+| 3   | `pingInterval`             | `> 0`                        | `wspulse: pingInterval must be positive`                                      |
+| 4   | `pingInterval`             | `<= 1 m`                     | `wspulse: pingInterval exceeds maximum (1m)`                                  |
+| 5   | `writeTimeout`             | `> 0`                        | `wspulse: writeTimeout must be positive`                                      |
+| 6   | `writeTimeout`             | `<= 30 s`                    | `wspulse: writeTimeout exceeds maximum (30s)`                                 |
+| 7   | `autoReconnect.maxRetries` | `>= 0`                       | `wspulse: autoReconnect.maxRetries must be non-negative`                      |
+| 8   | `autoReconnect.baseDelay`  | `> 0`                        | `wspulse: autoReconnect.baseDelay must be positive`                           |
+| 9   | `autoReconnect.baseDelay`  | `<= 1 m`                     | `wspulse: autoReconnect.baseDelay exceeds maximum (1m)`                       |
+| 10  | `autoReconnect.maxDelay`   | `>= autoReconnect.baseDelay` | `wspulse: autoReconnect.maxDelay must be >= autoReconnect.baseDelay`          |
+| 11  | `autoReconnect.maxDelay`   | `<= 5 m`                     | `wspulse: autoReconnect.maxDelay exceeds maximum (5m)`                        |
+| 12  | `autoReconnect.maxRetries` | `<= 32` (when `> 0`)         | `wspulse: autoReconnect.maxRetries exceeds maximum (32)`                      |
+| 13  | `sendBufferSize`           | `>= 1`                       | `wspulse: sendBufferSize must be at least 1`                                  |
+| 14  | `sendBufferSize`           | `<= 4096`                    | `wspulse: sendBufferSize exceeds maximum (4096)`                              |
 
 Notes:
 
@@ -117,7 +114,7 @@ Notes:
 - `maxMessageSize = 0` means disabled (no size limit enforced).
 - `autoReconnect.maxRetries = 0` means unlimited retries.
 - Upper bounds are intentionally conservative for a v0 library. They can be relaxed in future versions without breaking existing callers.
-- Boundary values (e.g. `maxRetries = 32`, `writeWait = 30s`) are valid and must be accepted.
+- Boundary values (e.g. `maxRetries = 32`, `writeTimeout = 30s`) are valid and must be accepted.
 - Language-specific validation (e.g. Go's `WithCodec(nil)` → `wspulse: codec must not be nil`) may add additional checks beyond this table.
 
 ---
